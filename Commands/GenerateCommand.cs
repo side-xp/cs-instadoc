@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using SideXP.Instadoc.Generation;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -7,11 +8,6 @@ namespace SideXP.Instadoc.Commands;
 /// <summary>
 /// The single (default) command: scans C# source folders and generates Markdown API docs.
 /// </summary>
-/// <remarks>
-/// The generation pipeline itself is not implemented yet — this command currently validates
-/// and echoes the resolved settings. See <c>infos/instadoc-project-guide.md</c> (§2) for the
-/// seven-step pipeline this will drive.
-/// </remarks>
 public sealed class GenerateCommand : Command<GenerateCommand.Settings>
 {
 
@@ -58,26 +54,30 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
     /// <inheritdoc cref="Command{T}.Execute(CommandContext, T, CancellationToken)"/>
     protected override int Execute(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
-        var visibility = settings.Visibility
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        AnsiConsole.MarkupLine("[bold]instadoc[/] — resolved settings:");
+        var options = new GeneratorOptions
+        {
+            Input = settings.Input,
+            Output = settings.Output,
+            Visibility = settings.Visibility
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            Exclude = settings.Exclude,
+            Nav = settings.Nav,
+        };
 
         var table = new Table().Border(TableBorder.Rounded);
         table.AddColumn("Setting");
         table.AddColumn("Value");
-        table.AddRow("Input", string.Join("\n", settings.Input));
-        table.AddRow("Output", settings.Output);
-        table.AddRow("Visibility", string.Join(", ", visibility));
-        table.AddRow("Exclude", settings.Exclude.Length == 0 ? "[dim](none)[/]" : string.Join("\n", settings.Exclude));
-        table.AddRow("Nav", settings.Nav ? "yes" : "no");
+        table.AddRow("Input", string.Join("\n", options.Input));
+        table.AddRow("Output", options.Output);
+        table.AddRow("Visibility", string.Join(", ", options.Visibility));
+        table.AddRow("Exclude", options.Exclude.Count == 0 ? "[dim](none)[/]" : string.Join("\n", options.Exclude));
+        table.AddRow("Nav", options.Nav ? "yes" : "no");
         AnsiConsole.Write(table);
 
-        // TODO: drive the generation pipeline (discover -> parse -> compile -> enumerate ->
-        // pull docs -> convert to Markdown -> render & write). See guide §2. Thread
-        // `cancellationToken` through each stage so a Ctrl+C aborts cleanly between files/types
-        // and cancels any async I/O.
-        AnsiConsole.MarkupLine("[yellow]The generation pipeline is not implemented yet.[/]");
+        var generator = new DocumentationGenerator();
+        var result = generator.Generate(options, cancellationToken);
+
+        AnsiConsole.MarkupLine("[yellow]@todo The generation pipeline is not implemented yet.[/]");
 
         return 0;
     }
