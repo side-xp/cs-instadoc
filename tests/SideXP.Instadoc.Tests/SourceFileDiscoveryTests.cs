@@ -15,7 +15,7 @@ public class SourceFileDiscoveryTests
     /// </summary>
     private static string SampleRoot => Path.Combine(AppContext.BaseDirectory, "Fixtures", "Sample");
 
-    [Fact]
+    [Fact(DisplayName = "Discover all C# files without using --exclude option")]
     public void Discovers_all_cs_files_when_no_excludes()
     {
         var discovery = new SourceFileDiscovery();
@@ -32,7 +32,7 @@ public class SourceFileDiscoveryTests
         });
     }
 
-    [Fact]
+    [Fact(DisplayName = "Discover all C# files but those in the Tests/ folder")]
     public void Excludes_files_under_a_tests_folder()
     {
         var discovery = new SourceFileDiscovery();
@@ -43,7 +43,7 @@ public class SourceFileDiscoveryTests
         Assert.DoesNotContain(files, path => path.Contains("AnimalTests"));
     }
 
-    [Fact]
+    [Fact(DisplayName = "Discover all C# files but those with *.Generated.cs suffix")]
     public void Excludes_generated_files_by_suffix()
     {
         var discovery = new SourceFileDiscovery();
@@ -54,7 +54,7 @@ public class SourceFileDiscoveryTests
         Assert.DoesNotContain(files, path => path.EndsWith("Models.Generated.cs"));
     }
 
-    [Fact]
+    [Fact(DisplayName = "Discover all C# files but those in the Tests/ folder or with *.Generated.cs suffix")]
     public void Applies_multiple_excludes_together()
     {
         var discovery = new SourceFileDiscovery();
@@ -64,7 +64,7 @@ public class SourceFileDiscoveryTests
         Assert.Equal(3, files.Count);
     }
 
-    [Fact]
+    [Fact(DisplayName = "Deduplicates files reached through overlapping inputs")]
     public void Deduplicates_files_reached_through_overlapping_inputs()
     {
         var discovery = new SourceFileDiscovery();
@@ -76,7 +76,7 @@ public class SourceFileDiscoveryTests
         Assert.Equal(5, files.Count);
     }
 
-    [Fact]
+    [Fact(DisplayName = "Returns results in a stable sorted order")]
     public void Returns_results_in_a_stable_sorted_order()
     {
         var discovery = new SourceFileDiscovery();
@@ -87,7 +87,7 @@ public class SourceFileDiscoveryTests
         Assert.Equal(sorted, files);
     }
 
-    [Fact]
+    [Fact(DisplayName = "Skips input folders that do not exist")]
     public void Skips_input_folders_that_do_not_exist()
     {
         var discovery = new SourceFileDiscovery();
