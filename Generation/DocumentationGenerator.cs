@@ -21,12 +21,16 @@ public sealed class DocumentationGenerator
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        // Step 1 — Discover the .cs files to document.
+        // Step 1: Discover the .cs files to document.
         var sourceFiles = new SourceFileDiscovery().Discover(options.Input, options.Exclude);
-        // Step 2 — Parse each file into a Roslyn syntax tree.
+        // Step 2: Parse each file into a Roslyn syntax tree.
         var syntaxTrees = new SourceParser().Parse(sourceFiles, cancellationToken);
+        // Step 3: Build a tolerant compilation (own + BCL types resolve, unknown externals degrade to error symbols).
+        var compilation = new CompilationBuilder().Build(syntaxTrees, cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
+
+        // @todo Steps 4-7: enumerate the API surface, pull doc comments, convert to Markdown, and write the files.
 
         return new GenerationResult
         {
