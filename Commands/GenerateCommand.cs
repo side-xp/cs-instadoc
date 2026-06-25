@@ -78,6 +78,7 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
         var result = generator.Generate(options, cancellationToken);
 
         AnsiConsole.MarkupLine($"Discovered [green]{result.SourceFilesDiscovered}[/] source file(s).");
+        AnsiConsole.MarkupLine($"Selected [green]{result.TypesDocumented}[/] type(s) to document.");
 
         return 0;
     }

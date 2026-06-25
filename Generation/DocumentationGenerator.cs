@@ -27,14 +27,17 @@ public sealed class DocumentationGenerator
         var syntaxTrees = new SourceParser().Parse(sourceFiles, cancellationToken);
         // Step 3: Build a tolerant compilation (own + BCL types resolve, unknown externals degrade to error symbols).
         var compilation = new CompilationBuilder().Build(syntaxTrees, cancellationToken);
+        // Step 4: Enumerate the API surface (types + members matching the requested visibility).
+        var surface = new ApiSurfaceExtractor().Extract(compilation, options.Visibility, cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // @todo Steps 4-7: enumerate the API surface, pull doc comments, convert to Markdown, and write the files.
+        // @todo Steps 5-7: pull each symbol's doc comment, convert to Markdown, and write one file per type.
 
         return new GenerationResult
         {
             SourceFilesDiscovered = sourceFiles.Count,
+            TypesDocumented = surface.Count,
         };
     }
 
