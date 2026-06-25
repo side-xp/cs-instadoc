@@ -117,6 +117,70 @@ protected override int Execute(CommandContext context, Settings settings, Cancel
 
 **Note**: The `CancellationToken` is signaled on Ctrl+C. Don't check it during instant work — thread it down into long-running stages (file I/O, parsing, network) and check it between units of work / honor it in async I/O, so a cancel aborts cleanly. A `ThrowIfCancellationRequested()` on an instant operation is just ceremony.
 
+## File globbing (Microsoft.Extensions.FileSystemGlobbing)
+
+When the app needs to find files by pattern — recursively, with include **and** exclude rules — use [`Microsoft.Extensions.FileSystemGlobbing`](https://learn.microsoft.com/dotnet/api/microsoft.extensions.filesystemglobbing) rather than hand-rolling `Directory.EnumerateFiles` plus manual filtering. It understands `**` recursive wildcards and layered include/exclude patterns, which is exactly the `--input` / `--exclude` shape most CLIs expose.
+
+### Add the dependency
+
+```sh
+dotnet add package Microsoft.Extensions.FileSystemGlobbing
+```
+
+### Match files under a folder
+
+Build a `Matcher`, register include and exclude globs, then run it against a directory. `Execute` takes a `DirectoryInfoWrapper`, not a raw path string:
+
+```csharp
+using Microsoft.Extensions.FileSystemGlobbing;
+using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
+
+var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+matcher.AddInclude("**/*.cs");
+matcher.AddExclude("**/Tests/**");
+matcher.AddExclude("**/*.Generated.cs");
+
+var root = Path.GetFullPath("./src");
+var result = matcher.Execute(new DirectoryInfoWrapper(new DirectoryInfo(root)));
+
+foreach (var file in result.Files)
+{
+    // file.Path is relative to `root` and uses forward slashes.
+    var absolute = Path.GetFullPath(Path.Combine(root, file.Path));
+    Console.WriteLine(absolute);
+}
+```
+
+**Note**: Patterns are evaluated **relative to the matched directory**, so `**/Tests/**` and `**/*.Generated.cs` work without anchoring them to an absolute path. The `**` token is what makes a pattern recursive — `*.cs` on its own matches only the top level.
+
+**Note**: `result.Files` yields **relative** paths with forward slashes (`a/b/File.cs`) on every OS. Re-anchor each one with `Path.Combine(root, file.Path)` then `Path.GetFullPath(...)` to get a normalized, absolute path with the platform's separators.
+
+**Note**: The `Matcher` constructor takes a `StringComparison`. Use `OrdinalIgnoreCase` on Windows (it also collapses the same file reached through two roots into one match); pass `Ordinal` only if you specifically need case-sensitive matching.
+
+### Scan multiple folders
+
+A `Matcher` runs against one root at a time, but the same instance is reusable — the registered patterns stay put, only the directory passed to `Execute` changes. For several `--input` folders, run it per folder and merge into a set so overlapping roots don't produce duplicates:
+
+```csharp
+var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+foreach (var input in inputs)
+{
+    var root = Path.GetFullPath(input);
+    if (!Directory.Exists(root))
+    {
+        continue; // skip missing folders (or surface a warning to the caller)
+    }
+
+    var result = matcher.Execute(new DirectoryInfoWrapper(new DirectoryInfo(root)));
+    foreach (var file in result.Files)
+    {
+        files.Add(Path.GetFullPath(Path.Combine(root, file.Path)));
+    }
+}
+```
+
+**Note**: Sort the final set before use (`StringComparer.OrdinalIgnoreCase`) if the output needs to be deterministic across runs — the file system enumeration order is not guaranteed.
+
 ## Versioning (MinVer)
 
 The preferred approach is to **derive the version from git tags** with [`MinVer`](https://github.com/adamralph/minver) rather than hardcoding `<Version>` in the `.csproj`. Tagging `v1.2.3` produces version `1.2.3`; between tags you get a prerelease version automatically. A release then needs no manual version bump — you just push a tag.
