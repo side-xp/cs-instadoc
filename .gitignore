@@ -71,4 +71,5 @@ x86/
 *.[Pp]ublish.xml
 
 # Custom
-infos/
+infos/**
+!infos/protocols.md
