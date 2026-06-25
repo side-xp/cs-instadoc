@@ -1,7 +1,7 @@
 namespace Sample.Shapes;
 
 /// <summary>
-/// A circle, defined by its radius.
+/// A circle, defined by its radius. Implements <see cref="IShape"/>.
 /// </summary>
 public sealed class Circle : IShape
 {
