@@ -17,7 +17,7 @@ public sealed record GeneratorOptions
     public required IReadOnlyList<string> Input { get; init; }
 
     /// <summary>
-    /// Folder that receives the generated Markdown (one file per type, plus the nav when requested).
+    /// Folder that receives the generated Markdown (one file per type, plus the index page when requested).
     /// </summary>
     public required string Output { get; init; }
 
@@ -32,8 +32,8 @@ public sealed record GeneratorOptions
     public IReadOnlyList<string> Exclude { get; init; } = [];
 
     /// <summary>
-    /// When <see langword="true"/>, also write the index for the generated pages.
+    /// When <see langword="true"/>, also write a Markdown index page linking every generated type page.
     /// </summary>
-    public bool Nav { get; init; }
+    public bool Index { get; init; }
 
 }

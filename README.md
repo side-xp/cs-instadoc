@@ -11,7 +11,7 @@ dotnet tool install --global SideXP.Instadoc
 ## Usage
 
 ```bash
-instadoc --input ./Packages/com.you.mypackage --output ./docs/api --nav
+instadoc --input ./src --output ./docs/api --index
 ```
 
 | Option | Purpose |
@@ -20,11 +20,11 @@ instadoc --input ./Packages/com.you.mypackage --output ./docs/api --nav
 | `--output` / `-o` | Output folder for the generated Markdown. |
 | `--visibility` | Comma list of visibility levels; default `public protected`. |
 | `--exclude` | Glob(s) to skip (e.g. `**/Tests/**`, `**/*.Generated.cs`). |
-| `--nav` | Also write the MkDocs nav/index for the generated pages. |
+| `--index` | Also write a Markdown index page linking every generated type page. |
 
 ## How it works
 
-Instadoc parses every `.cs` file into a Roslyn syntax tree, combines them into a single *tolerant* compilation (the .NET 10 BCL reference assemblies are added, compiler diagnostics are ignored), enumerates the public/protected API surface from symbols, pulls each symbol's XML doc comment, and converts the documentation tags to Markdown — emitting one file per type plus an optional MkDocs nav.
+Instadoc parses every `.cs` file into a Roslyn syntax tree, combines them into a single *tolerant* compilation (the .NET 10 BCL reference assemblies are added, compiler diagnostics are ignored), enumerates the public/protected API surface from symbols, pulls each symbol's XML doc comment, and converts the documentation tags to Markdown — emitting one file per type plus an optional index page.
 
 Because docs are regenerated from source, they can't drift from the code.
 

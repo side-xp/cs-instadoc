@@ -30,9 +30,9 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
         [Description("Glob(s) to skip (e.g. **/Tests/**, **/*.Generated.cs). Repeatable.")]
         public string[] Exclude { get; init; } = [];
 
-        [CommandOption("--nav")]
-        [Description("Also write the MkDocs nav/index for the generated pages.")]
-        public bool Nav { get; init; }
+        [CommandOption("--index")]
+        [Description("Also write a Markdown index page linking every generated type page.")]
+        public bool Index { get; init; }
 
         /// <inheritdoc cref="CommandSettings.Validate"/>
         public override ValidationResult Validate()
@@ -61,7 +61,7 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
             Visibility = settings.Visibility
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             Exclude = settings.Exclude,
-            Nav = settings.Nav,
+            Index = settings.Index,
         };
 
         var table = new Table().Border(TableBorder.Rounded);
@@ -71,7 +71,7 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
         table.AddRow("Output", options.Output);
         table.AddRow("Visibility", string.Join(", ", options.Visibility));
         table.AddRow("Exclude", options.Exclude.Count == 0 ? "[dim](none)[/]" : string.Join("\n", options.Exclude));
-        table.AddRow("Nav", options.Nav ? "yes" : "no");
+        table.AddRow("Index", options.Index ? "yes" : "no");
         AnsiConsole.Write(table);
 
         var generator = new DocumentationGenerator();
