@@ -14,6 +14,8 @@ public class CompilationBuilderTests
 
     private static string ExternalFile => Path.Combine(AppContext.BaseDirectory, "Fixtures", "External", "Widget.cs");
 
+    private static string ImplicitFile => Path.Combine(AppContext.BaseDirectory, "Fixtures", "ImplicitUsings", "UsesImplicit.cs");
+
     private static CSharpCompilationFor BuildFrom(params string[] files)
     {
         var trees = new SourceParser().Parse(files);
@@ -75,6 +77,23 @@ public class CompilationBuilderTests
         // UnityEngine.GameObject is not on the reference path: it must be an error symbol, not a crash.
         Assert.Equal(TypeKind.Error, targetType.TypeKind);
         Assert.IsAssignableFrom<IErrorTypeSymbol>(targetType);
+    }
+
+    [Fact(DisplayName = "Resolves short-name BCL types via the injected implicit usings")]
+    public void Resolves_short_name_bcl_types_via_implicit_usings()
+    {
+        var compilation = BuildFrom(ImplicitFile);
+
+        // CancellationToken is written with no using; it resolves only because the implicit usings are injected.
+        var tokenType = compilation.GetType("Sample.Implicit.UsesImplicit")!
+            .GetMembers("Token")
+            .OfType<IPropertySymbol>()
+            .Single()
+            .Type;
+
+        Assert.NotEqual(TypeKind.Error, tokenType.TypeKind);
+        Assert.True(tokenType.IsValueType);
+        Assert.Equal("CancellationToken", tokenType.Name);
     }
 
     /// <summary>

@@ -257,10 +257,21 @@ public sealed partial class DocumentationRenderer
         {
             baseList.Add(baseType.ToDisplayString(TypeReference));
         }
-        baseList.AddRange(type.Interfaces.Select(i => i.ToDisplayString(TypeReference)));
+        baseList.AddRange(type.Interfaces
+            .Where(@interface => !IsSynthesizedRecordInterface(type, @interface))
+            .Select(@interface => @interface.ToDisplayString(TypeReference)));
 
         return baseList.Count > 0 ? $"{signature} : {string.Join(", ", baseList)}" : signature;
     }
+
+    /// <summary>
+    /// True for the <c>IEquatable&lt;TSelf&gt;</c> interface the compiler synthesizes on every record (noise in the
+    /// declaration line, never written by the author).
+    /// </summary>
+    private static bool IsSynthesizedRecordInterface(INamedTypeSymbol type, INamedTypeSymbol @interface)
+        => type.IsRecord
+            && @interface is { Name: "IEquatable", TypeArguments.Length: 1, ContainingNamespace.Name: "System" }
+            && SymbolEqualityComparer.Default.Equals(@interface.TypeArguments[0], type);
 
     private static string TypeKindKeyword(INamedTypeSymbol type) => type switch
     {

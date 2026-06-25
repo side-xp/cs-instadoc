@@ -88,4 +88,35 @@ public class DocumentationRendererTests
         Assert.Contains("## Sample.Shapes", index);
         Assert.Contains("[Circle](Sample.Shapes.Circle.md)", index);
     }
+
+    [Fact(DisplayName = "Omits the synthesized IEquatable from a record signature")]
+    public void Record_signature_omits_synthesized_iequatable()
+    {
+        var pages = new DocumentationRenderer().Render(SurfaceFrom(SignaturesFile), includeIndex: false);
+
+        var point = Page(pages, "Sample.Signatures.Point.md");
+        Assert.Contains("public record Point", point);
+        Assert.DoesNotContain("IEquatable<Point>", point);
+    }
+
+    [Fact(DisplayName = "A resolved value-type default does not render as = null")]
+    public void Resolved_value_type_default_is_not_null()
+    {
+        var pages = new DocumentationRenderer().Render(SurfaceFrom(SignaturesFile), includeIndex: false);
+
+        // A resolved struct default renders as default(T), never the misleading = null (which only happens when the
+        // parameter's type is unresolved). See CompilationBuilder's implicit-usings injection.
+        var worker = Page(pages, "Sample.Signatures.Worker.md");
+        Assert.Contains("cancellationToken = default(CancellationToken)", worker);
+        Assert.DoesNotContain("= null", worker);
+    }
+
+    private static string SignaturesFile => Path.Combine(AppContext.BaseDirectory, "Fixtures", "Signatures", "Samples.cs");
+
+    private static IReadOnlyList<DocumentedType> SurfaceFrom(params string[] files)
+    {
+        var trees = new SourceParser().Parse(files);
+        var compilation = new CompilationBuilder().Build(trees);
+        return new ApiSurfaceExtractor().Extract(compilation, ["public", "protected"]);
+    }
 }
