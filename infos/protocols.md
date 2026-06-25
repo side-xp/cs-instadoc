@@ -181,6 +181,102 @@ foreach (var input in inputs)
 
 **Note**: Sort the final set before use (`StringComparer.OrdinalIgnoreCase`) if the output needs to be deterministic across runs — the file system enumeration order is not guaranteed.
 
+## Testing (xUnit)
+
+The preferred test framework is [xUnit](https://xunit.net/). Tests live in their **own project** (one per project under test), never mixed into the application or library being tested — a test project references the project under test, exercises its public surface, and is itself never shipped.
+
+### Create the test project
+
+By convention, test projects live under a `tests/` folder and are named `<ProjectName>.Tests`:
+
+```sh
+dotnet new xunit -o tests/MyApp.Tests -n MyApp.Tests
+```
+
+The template already targets the current framework, sets `<IsPackable>false</IsPackable>` (a test project is never packed or published), and pulls in the three packages that make it work:
+
+- **`xunit`** — the `[Fact]` attribute and the `Assert` API.
+- **`Microsoft.NET.Test.Sdk`** — the MSBuild/runtime glue that makes the project runnable as a test suite.
+- **`xunit.runner.visualstudio`** — lets `dotnet test` and the Visual Studio Test Explorer discover and run the tests.
+
+### Wire it into the solution
+
+Add the new project to the solution, and reference the project under test so the tests can `using` its types:
+
+```sh
+dotnet sln add tests/MyApp.Tests/MyApp.Tests.csproj
+dotnet add tests/MyApp.Tests/MyApp.Tests.csproj reference MyApp.csproj
+```
+
+**Note**: `dotnet sln` works with both the classic `.sln` and the newer `.slnx` solution formats — pass whichever the repo uses (`dotnet sln MyApp.slnx add ...`), or omit the name and the CLI finds the single solution in the folder.
+
+**Note**: A test project references the project under test, **never the reverse**. The reference gives the tests access to every `public` type; nothing about testing should leak into the shipped project.
+
+### Write a test
+
+A test is a `public` method marked `[Fact]`, grouped into a plain class. The runner discovers and runs every `[Fact]` in isolation. The standard shape is **Arrange → Act → Assert**:
+
+```csharp
+using MyApp;
+
+namespace MyApp.Tests;
+
+public class CalculatorTests
+{
+    [Fact]
+    public void Adds_two_numbers()
+    {
+        var calculator = new Calculator();   // Arrange
+        var result = calculator.Add(2, 3);    // Act
+        Assert.Equal(5, result);              // Assert
+    }
+}
+```
+
+A test fails if any `Assert` fails or the method throws; otherwise it passes. Common assertions: `Assert.Equal`, `Assert.True`/`False`, `Assert.Contains`/`DoesNotContain`, `Assert.Throws<T>`, `Assert.Empty`.
+
+**Note**: For the same test run against many inputs, use `[Theory]` with `[InlineData(...)]` rows instead of copy-pasting `[Fact]` methods — each row becomes its own reported test case.
+
+### Run the tests
+
+```sh
+dotnet test                  # builds and runs every test project in the solution
+dotnet test --nologo         # quieter output
+```
+
+In Visual Studio, *Test → Test Explorer* lists every `[Fact]` with pass/fail status and can run or **debug** a single test. Both routes use the same runner packages.
+
+### Tests that need files on disk (fixtures)
+
+When tests need real sample files (inputs to parse, scan, or read), keep them as **fixtures** that are *not* compiled into the test assembly but *are* copied next to the test binaries so they exist at runtime. In the test `.csproj`:
+
+```xml
+<ItemGroup>
+  <Compile Remove="Fixtures/**/*.cs" />
+  <Content Include="Fixtures/**/*" CopyToOutputDirectory="PreserveNewest" />
+</ItemGroup>
+```
+
+Locate them at runtime relative to the test assembly, via `AppContext.BaseDirectory` (the folder the test `.dll` runs from, eg. `bin/Debug/net10.0`):
+
+```csharp
+var fixtures = Path.Combine(AppContext.BaseDirectory, "Fixtures");
+```
+
+**Note**: The `<Compile Remove>` matters whenever fixtures are `.cs` files — otherwise the SDK's default `**/*.cs` glob would compile them as part of the test assembly. Fixtures are *data*, not code.
+
+### Gotcha: a project at the repository root
+
+If the project under test sits at the **repository root** (rather than in its own `src/` subfolder), its default `**/*.cs` glob extends over the whole tree — including `tests/` — and the project will try to compile the test sources, failing because they reference test-only packages. Exclude the test tree from the main project's `.csproj`:
+
+```xml
+<ItemGroup>
+  <Compile Remove="tests/**/*.cs" />
+</ItemGroup>
+```
+
+**Note**: This is a symptom of any root-level project, not of testing specifically — the default compile glob sweeps every `.cs` below the project file. A project laid out under `src/` with tests under `tests/` sidesteps it entirely.
+
 ## Versioning (MinVer)
 
 The preferred approach is to **derive the version from git tags** with [`MinVer`](https://github.com/adamralph/minver) rather than hardcoding `<Version>` in the `.csproj`. Tagging `v1.2.3` produces version `1.2.3`; between tags you get a prerelease version automatically. A release then needs no manual version bump — you just push a tag.
