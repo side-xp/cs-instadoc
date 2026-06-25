@@ -43,4 +43,12 @@
     <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
+  <!--
+    This project lives at the repository root, so the SDK's default **/*.cs glob would otherwise reach down into the
+    test project. The test sources belong to SideXP.Instadoc.Tests, not to the tool.
+  -->
+  <ItemGroup>
+    <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
+
 </Project>
