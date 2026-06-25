@@ -21,7 +21,10 @@ public sealed class DocumentationGenerator
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        // Step 1 — Discover the .cs files to document.
         var sourceFiles = new SourceFileDiscovery().Discover(options.Input, options.Exclude);
+        // Step 2 — Parse each file into a Roslyn syntax tree.
+        var syntaxTrees = new SourceParser().Parse(sourceFiles, cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
 
