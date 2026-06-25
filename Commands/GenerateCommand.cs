@@ -79,6 +79,7 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
 
         AnsiConsole.MarkupLine($"Discovered [green]{result.SourceFilesDiscovered}[/] source file(s).");
         AnsiConsole.MarkupLine($"Selected [green]{result.TypesDocumented}[/] type(s) to document.");
+        AnsiConsole.MarkupLine($"Wrote [green]{result.FilesWritten.Count}[/] file(s) to [blue]{options.Output}[/].");
 
         return 0;
     }

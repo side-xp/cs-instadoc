@@ -21,24 +21,57 @@ public sealed class DocumentationGenerator
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        // Step 1: Discover the .cs files to document.
+        // Discover the .cs files to document.
         var sourceFiles = new SourceFileDiscovery().Discover(options.Input, options.Exclude);
-        // Step 2: Parse each file into a Roslyn syntax tree.
+        // Parse each file into a Roslyn syntax tree.
         var syntaxTrees = new SourceParser().Parse(sourceFiles, cancellationToken);
-        // Step 3: Build a tolerant compilation (own + BCL types resolve, unknown externals degrade to error symbols).
+        // Build a tolerant compilation (own + BCL types resolve, unknown externals degrade to error symbols).
         var compilation = new CompilationBuilder().Build(syntaxTrees, cancellationToken);
-        // Step 4: Enumerate the API surface (types + members matching the requested visibility).
+        // Enumerate the API surface (types + members matching the requested visibility).
         var surface = new ApiSurfaceExtractor().Extract(compilation, options.Visibility, cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // @todo Steps 5-7: pull each symbol's doc comment, convert to Markdown, and write one file per type.
+        // Render one Markdown page per type (pulling and converting doc comments), then write them out.
+        var pages = new DocumentationRenderer().Render(surface, options.Index, cancellationToken);
+        var filesWritten = WritePages(pages, options.Output, cancellationToken);
 
         return new GenerationResult
         {
             SourceFilesDiscovered = sourceFiles.Count,
             TypesDocumented = surface.Count,
+            FilesWritten = filesWritten,
         };
+    }
+
+    /// <summary>
+    /// Writes the rendered pages under the output folder, creating directories as needed.
+    /// </summary>
+    /// <returns>The full paths of the files written, in page order.</returns>
+    private static IReadOnlyList<string> WritePages(
+        IReadOnlyList<RenderedPage> pages,
+        string outputFolder,
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(outputFolder);
+
+        var written = new List<string>(pages.Count);
+        foreach (var page in pages)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var path = Path.Combine(outputFolder, page.RelativePath);
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(path, page.Content);
+            written.Add(path);
+        }
+
+        return written;
     }
 
 }
