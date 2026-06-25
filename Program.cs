@@ -16,7 +16,7 @@ app.Configure(config =>
         config.SetApplicationVersion(version);
     }
 
-    config.AddExample("--input", "./path/to/folder", "--output", "./docs/api", "--nav");
+    config.AddExample("--input", "./path/to/folder", "--output", "./docs/api", "--index");
 });
 
 return app.Run(args);

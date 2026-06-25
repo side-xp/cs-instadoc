@@ -21,11 +21,14 @@ public sealed class DocumentationGenerator
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        // @todo
+        var sourceFiles = new SourceFileDiscovery().Discover(options.Input, options.Exclude);
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        return new GenerationResult();
+        return new GenerationResult
+        {
+            SourceFilesDiscovered = sourceFiles.Count,
+        };
     }
 
 }

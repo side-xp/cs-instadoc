@@ -77,7 +77,7 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
         var generator = new DocumentationGenerator();
         var result = generator.Generate(options, cancellationToken);
 
-        AnsiConsole.MarkupLine("[yellow]@todo The generation pipeline is not implemented yet.[/]");
+        AnsiConsole.MarkupLine($"Discovered [green]{result.SourceFilesDiscovered}[/] source file(s).");
 
         return 0;
     }

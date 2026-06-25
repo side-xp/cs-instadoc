@@ -7,6 +7,11 @@ public sealed record GenerationResult
 {
 
     /// <summary>
+    /// Number of <c>.cs</c> source files discovered and fed into the pipeline.
+    /// </summary>
+    public int SourceFilesDiscovered { get; init; }
+
+    /// <summary>
     /// Number of types selected and rendered.
     /// </summary>
     public int TypesDocumented { get; init; }
