@@ -21,6 +21,7 @@ instadoc --input ./src --output ./docs/api --index
 | `--visibility` | Comma list of visibility levels; default `public protected`. |
 | `--exclude` | Glob(s) to skip (e.g. `**/Tests/**`, `**/*.Generated.cs`). |
 | `--index` | Also write a Markdown index page linking every generated type page. |
+| `--no-clean` | Keep existing files in the output folder. By default, stale `.md` files are cleared before writing so renamed/removed types don't linger. |
 
 ## How it works
 

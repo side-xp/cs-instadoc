@@ -36,4 +36,11 @@ public sealed record GeneratorOptions
     /// </summary>
     public bool Index { get; init; }
 
+    /// <summary>
+    /// When <see langword="true"/> (the default), stale Markdown is cleared from the output folder before writing, so
+    /// renamed or removed types don't linger as orphans. Set to <see langword="false"/> to leave existing files in
+    /// place; pages that match this run's output are overwritten regardless.
+    /// </summary>
+    public bool Clean { get; init; } = true;
+
 }

@@ -34,7 +34,7 @@ public sealed class DocumentationGenerator
 
         // Render one Markdown page per type (pulling and converting doc comments), then write them out.
         var pages = new DocumentationRenderer().Render(surface, options.Index, cancellationToken);
-        var filesWritten = WritePages(pages, options.Output, cancellationToken);
+        var filesWritten = WritePages(pages, options.Output, options.Clean, cancellationToken);
 
         return new GenerationResult
         {
@@ -45,15 +45,22 @@ public sealed class DocumentationGenerator
     }
 
     /// <summary>
-    /// Writes the rendered pages under the output folder, creating directories as needed.
+    /// Writes the rendered pages under the output folder, creating directories as needed. When <paramref name="clean"/>
+    /// is set, stale Markdown left from a previous run is cleared first (see <see cref="ClearStaleOutput"/>).
     /// </summary>
     /// <returns>The full paths of the files written, in page order.</returns>
     private static IReadOnlyList<string> WritePages(
         IReadOnlyList<RenderedPage> pages,
         string outputFolder,
+        bool clean,
         CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(outputFolder);
+
+        if (clean)
+        {
+            ClearStaleOutput(outputFolder, cancellationToken);
+        }
 
         var written = new List<string>(pages.Count);
         foreach (var page in pages)
@@ -72,6 +79,27 @@ public sealed class DocumentationGenerator
         }
 
         return written;
+    }
+
+    /// <summary>
+    /// Deletes the Markdown files at the top level of the output folder before a fresh write, so that types renamed
+    /// or removed since the last run don't linger as orphans.
+    /// </summary>
+    /// <remarks>
+    /// Scoped deliberately: only <c>*.md</c> files, only at the top level (the tool writes a flat folder), so non-Markdown
+    /// content and nested folders the user keeps alongside the output are left untouched. The extension is re-checked
+    /// because the <c>*.md</c> search pattern is matched by the OS rather than by us.
+    /// </remarks>
+    private static void ClearStaleOutput(string outputFolder, CancellationToken cancellationToken)
+    {
+        var stale = Directory.EnumerateFiles(outputFolder, "*.md", SearchOption.TopDirectoryOnly)
+            .Where(path => path.EndsWith(".md", StringComparison.OrdinalIgnoreCase));
+
+        foreach (var path in stale)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Delete(path);
+        }
     }
 
 }
