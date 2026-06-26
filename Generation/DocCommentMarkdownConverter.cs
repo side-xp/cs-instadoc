@@ -165,7 +165,7 @@ public sealed partial class DocCommentMarkdownConverter
             switch (node)
             {
                 case XText text:
-                    paragraph.Append(text.Value);
+                    paragraph.Append(EscapeMarkdown(text.Value));
                     break;
 
                 case XElement { Name.LocalName: "para" } para:
@@ -204,7 +204,7 @@ public sealed partial class DocCommentMarkdownConverter
             switch (node)
             {
                 case XText text:
-                    sb.Append(text.Value);
+                    sb.Append(EscapeMarkdown(text.Value));
                     break;
                 case XElement element:
                     sb.Append(RenderInlineElement(element));
@@ -314,6 +314,12 @@ public sealed partial class DocCommentMarkdownConverter
     private static string NormalizeInline(string text) => WhitespaceRun().Replace(text, " ").Trim();
 
     /// <summary>
+    /// Escapes Markdown metacharacters in a plain-text run so they render literally.
+    /// Only applied to raw text nodes; content already inside code spans or fenced blocks is not passed here.
+    /// </summary>
+    private static string EscapeMarkdown(string text) => MarkdownMetaChar().Replace(text, m => @"\" + m.Value);
+
+    /// <summary>
     /// Removes the common leading indentation shared by every non-blank line of a code block.
     /// </summary>
     private static string Dedent(string text)
@@ -360,5 +366,8 @@ public sealed partial class DocCommentMarkdownConverter
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhitespaceRun();
+
+    [GeneratedRegex(@"[*_\[]")]
+    private static partial Regex MarkdownMetaChar();
 
 }

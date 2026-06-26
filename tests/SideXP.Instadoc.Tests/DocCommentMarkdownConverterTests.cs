@@ -114,6 +114,38 @@ public class DocCommentMarkdownConverterTests
         Assert.Equal("First.\n\nSecond.", md);
     }
 
+    [Fact(DisplayName = "Escapes * in inline text so it does not create emphasis")]
+    public void Escapes_asterisk_in_text()
+    {
+        var md = Convert("<member><summary>Computes a*b for any scalar.</summary></member>");
+
+        Assert.Equal(@"Computes a\*b for any scalar.", md);
+    }
+
+    [Fact(DisplayName = "Escapes _ in inline text so it does not create emphasis")]
+    public void Escapes_underscore_in_text()
+    {
+        var md = Convert("<member><summary>Accesses the _internal_ buffer directly.</summary></member>");
+
+        Assert.Equal(@"Accesses the \_internal\_ buffer directly.", md);
+    }
+
+    [Fact(DisplayName = "Escapes [ in inline text so it does not create a link")]
+    public void Escapes_bracket_in_text()
+    {
+        var md = Convert("<member><param name=\"index\">Index in the [0, n) range.</param></member>");
+
+        Assert.Contains(@"Index in the \[0, n) range.", md);
+    }
+
+    [Fact(DisplayName = "Does not escape metacharacters inside <c> spans or <code> blocks")]
+    public void Does_not_escape_inside_code_spans()
+    {
+        var md = Convert("<member><summary>Use <c>a*b</c> or <c>_x</c>.</summary></member>");
+
+        Assert.Equal("Use `a*b` or `_x`.", md);
+    }
+
     [Fact(DisplayName = "End to end: reads a real symbol's doc and converts it")]
     public void End_to_end_from_reader()
     {
