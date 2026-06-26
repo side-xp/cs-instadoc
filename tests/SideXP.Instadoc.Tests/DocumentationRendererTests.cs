@@ -89,6 +89,28 @@ public class DocumentationRendererTests
         Assert.Contains("[Circle](Sample.Shapes.Circle.md)", index);
     }
 
+    [Fact(DisplayName = "Namespace grouping places each type page in its namespace folder")]
+    public void Namespace_grouping_folders_pages()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false, Grouping.Namespace);
+
+        Assert.Contains(pages, page => page.RelativePath == "Sample.Shapes/Circle.md");
+        Assert.Contains(pages, page => page.RelativePath == "Sample/IShape.md");
+        // Sibling, not nested: Sample.Shapes is its own folder, not under a Sample/ tree.
+        Assert.DoesNotContain(pages, page => page.RelativePath == "Sample/Shapes/Circle.md");
+    }
+
+    [Fact(DisplayName = "Namespace grouping relativizes a cross-namespace cref link")]
+    public void Namespace_grouping_relativizes_cross_namespace_link()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: true, Grouping.Namespace);
+
+        // Circle (Sample.Shapes) references IShape (Sample): from Sample.Shapes/ up to Sample/IShape.md.
+        Assert.Contains("[IShape](../Sample/IShape.md)", Page(pages, "Sample.Shapes/Circle.md"));
+        // The index lives at the root, so its links are the plain folder paths.
+        Assert.Contains("[Circle](Sample.Shapes/Circle.md)", Page(pages, "index.md"));
+    }
+
     [Fact(DisplayName = "Omits the synthesized IEquatable from a record signature")]
     public void Record_signature_omits_synthesized_iequatable()
     {
