@@ -41,13 +41,6 @@ public sealed partial class DocCommentMarkdownConverter
 
         var sb = new StringBuilder();
 
-        // A top-level <inheritdoc/> still present here is one the resolver could not expand (no documented own-source
-        // ancestor): render a short note rather than a blank body.
-        if (member.Element("inheritdoc") is not null)
-        {
-            sb.Append("*Inherited documentation.*\n\n");
-        }
-
         AppendSection(sb, member.Element("summary"), heading: null);
         AppendNamedList(sb, member.Elements("typeparam"), "Type parameters");
         AppendNamedList(sb, member.Elements("param"), "Parameters");
@@ -58,7 +51,16 @@ public sealed partial class DocCommentMarkdownConverter
         AppendSection(sb, member.Element("remarks"), "Remarks");
         AppendCrefList(sb, member.Elements("seealso"), "See also");
 
-        return sb.ToString().Trim();
+        var body = sb.ToString().Trim();
+
+        // A residual top-level <inheritdoc/> is one the resolver could not expand. Only note it when the member has no
+        // documentation of its own — otherwise the note is just noise on top of real content.
+        if (body.Length == 0 && member.Element("inheritdoc") is not null)
+        {
+            return "*Inherited documentation.*";
+        }
+
+        return body;
     }
 
     /// <summary>

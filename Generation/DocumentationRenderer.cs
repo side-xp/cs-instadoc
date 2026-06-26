@@ -64,12 +64,15 @@ public sealed partial class DocumentationRenderer
     /// <param name="surface">The selected types and members (eg. from <see cref="ApiSurfaceExtractor"/>).</param>
     /// <param name="includeIndex">When <see langword="true"/>, also produce an <c>index.md</c> page.</param>
     /// <param name="grouping">How type pages are laid out under the output folder (see <see cref="Grouping"/>).</param>
+    /// <param name="compilation">The compilation the surface came from, used to resolve <c>cref</c>-qualified
+    /// <c>&lt;inheritdoc/&gt;</c>; optional (override/interface inheritance still works without it).</param>
     /// <param name="cancellationToken">Honored between pages.</param>
     /// <returns>One page per type, plus the index page when requested.</returns>
     public IReadOnlyList<RenderedPage> Render(
         IReadOnlyList<DocumentedType> surface,
         bool includeIndex,
         Grouping grouping = Grouping.None,
+        Compilation? compilation = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(surface);
@@ -87,7 +90,7 @@ public sealed partial class DocumentationRenderer
             pages.Add(new RenderedPage
             {
                 RelativePath = path,
-                Content = RenderType(type, converter),
+                Content = RenderType(type, converter, compilation),
             });
         }
 
@@ -159,7 +162,7 @@ public sealed partial class DocumentationRenderer
     /// <summary>
     /// Renders one type's page: header, signature, type docs, then grouped members.
     /// </summary>
-    private string RenderType(DocumentedType type, DocCommentMarkdownConverter converter)
+    private string RenderType(DocumentedType type, DocCommentMarkdownConverter converter, Compilation? compilation)
     {
         var sb = new StringBuilder();
 
@@ -172,7 +175,7 @@ public sealed partial class DocumentationRenderer
 
         sb.Append("```csharp\n").Append(TypeSignature(type.Symbol)).Append("\n```\n\n");
 
-        AppendDoc(sb, type.Symbol, converter);
+        AppendDoc(sb, type.Symbol, converter, compilation);
 
         foreach (var (title, predicate) in MemberGroups)
         {
@@ -188,7 +191,7 @@ public sealed partial class DocumentationRenderer
                 sb.Append("### ").Append(member.ToDisplayString(MemberTitle)).Append("\n\n");
                 sb.Append("<a id=\"").Append(AnchorFor(member)).Append("\"></a>\n\n");
                 sb.Append("```csharp\n").Append(member.ToDisplayString(MemberSignature)).Append("\n```\n\n");
-                AppendDoc(sb, member, converter);
+                AppendDoc(sb, member, converter, compilation);
             }
         }
 
@@ -198,7 +201,11 @@ public sealed partial class DocumentationRenderer
     /// <summary>
     /// Appends a symbol's converted documentation body, if it has any.
     /// </summary>
-    private void AppendDoc(StringBuilder sb, ISymbol symbol, DocCommentMarkdownConverter converter)
+    private void AppendDoc(
+        StringBuilder sb,
+        ISymbol symbol,
+        DocCommentMarkdownConverter converter,
+        Compilation? compilation)
     {
         var doc = _reader.Read(symbol);
         if (doc is null)
@@ -206,8 +213,8 @@ public sealed partial class DocumentationRenderer
             return;
         }
 
-        // Expand a top-level <inheritdoc/> from the overridden/implemented member before converting.
-        doc = _inheritDoc.Resolve(symbol, doc);
+        // Expand a top-level <inheritdoc/> (cref-named, else the overridden/implemented member) before converting.
+        doc = _inheritDoc.Resolve(symbol, doc, compilation);
 
         var body = converter.Convert(doc);
         if (body.Length > 0)

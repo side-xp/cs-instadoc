@@ -27,11 +27,20 @@ public class InheritDocTests
         var trees = new SourceParser().Parse([InheritanceFile]);
         var compilation = new CompilationBuilder().Build(trees);
         var surface = new ApiSurfaceExtractor().Extract(compilation, ["public", "protected"]);
-        return new DocumentationRenderer().Render(surface, includeIndex: false);
+        return new DocumentationRenderer().Render(surface, includeIndex: false, compilation: compilation);
     }
 
     private static string Page(IReadOnlyList<RenderedPage> pages, string relativePath)
         => pages.Single(page => page.RelativePath == relativePath).Content;
+
+    /// <summary>The slice of a page covering one member: from its <c>### heading</c> to the next one (or the end).</summary>
+    private static string Section(string page, string heading)
+    {
+        var start = page.IndexOf("### " + heading, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"section '{heading}' not found");
+        var next = page.IndexOf("### ", start + 4, StringComparison.Ordinal);
+        return next >= 0 ? page[start..next] : page[start..];
+    }
 
     [Fact(DisplayName = "Inherits docs from an overridden base method")]
     public void Inherits_from_overridden_method()
@@ -86,8 +95,6 @@ public class InheritDocTests
         Assert.Contains("The widget's identifier.", widget);
     }
 
-    // -- Partial inheritance: local tags win per key, the rest is inherited -----------------------
-
     [Fact(DisplayName = "Re-documenting one parameter still inherits the summary, other params and returns")]
     public void Partial_redocuments_one_parameter()
     {
@@ -123,5 +130,49 @@ public class InheritDocTests
         Assert.Contains("Runs the command against the given target.", page); // inherited summary
         Assert.Contains("The path the command operates on.", page);          // inherited param
         Assert.Contains("How many times to retry on failure.", page);        // inherited param
+    }
+
+    [Fact(DisplayName = "Inherits docs from a cref-named overload, keeping its own summary")]
+    public void Inherits_from_cref_named_overload()
+    {
+        var page = Page(RenderInheritanceFixture(), "Sample.Inheritance.Lookup.md");
+        // Both overloads live on the same page, so scope to the inheriting one.
+        var find = Section(page, "Find(int, string)");
+
+        Assert.Contains("Finds an entry by its numeric id.", find);   // own summary
+        Assert.DoesNotContain("Finds an entry by its key.", find);    // source summary not pulled in
+        Assert.Contains("Returned when the key is absent.", find);    // inherited shared param
+        Assert.Contains("The matching entry, or the fallback.", find); // inherited returns
+    }
+
+    [Fact(DisplayName = "An inherited param that the target does not declare is filtered out")]
+    public void Cref_inheritance_filters_non_matching_params()
+    {
+        var page = Page(RenderInheritanceFixture(), "Sample.Inheritance.Lookup.md");
+        var find = Section(page, "Find(int, string)");
+
+        // Find(int, string) has no `key` parameter, so the source's <param name="key"> must not leak in.
+        Assert.DoesNotContain("The key to look up.", find);
+    }
+
+    [Fact(DisplayName = "Resolves a cref pointing at a private (non-surfaced) member")]
+    public void Inherits_from_cref_to_private_member()
+    {
+        var page = Page(RenderInheritanceFixture(), "Sample.Inheritance.Facade.md");
+
+        // Facade.Run inherits from the private Compute(int): resolution goes through the compilation, not the surface.
+        Assert.Contains("Computes a result for the given input.", page);
+        Assert.Contains("The value to process.", page);
+        Assert.Contains("The computed result.", page);
+    }
+
+    [Fact(DisplayName = "No fallback note when the member already has its own documentation")]
+    public void No_fallback_note_when_member_has_own_docs()
+    {
+        var page = Page(RenderInheritanceFixture(), "Sample.Inheritance.Tag.md");
+
+        // Tag.ToString has an unresolvable <inheritdoc/> but its own summary, so the note must be suppressed.
+        Assert.Contains("Returns the tag's text.", page);
+        Assert.DoesNotContain("Inherited documentation", page);
     }
 }

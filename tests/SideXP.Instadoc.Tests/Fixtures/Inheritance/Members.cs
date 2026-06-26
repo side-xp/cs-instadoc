@@ -94,3 +94,43 @@ public sealed class CountingCommand : CommandBase
     /// <returns>The number of files that were changed.</returns>
     public override int Run(string target, int retries) => 0;
 }
+
+/// <summary>
+/// Overloads that reuse documentation via <c>&lt;inheritdoc cref="..."/&gt;</c> — pointing at a sibling overload rather
+/// than overriding or implementing anything.
+/// </summary>
+public static class Lookup
+{
+    /// <summary>Finds an entry by its key.</summary>
+    /// <param name="key">The key to look up.</param>
+    /// <param name="fallback">Returned when the key is absent.</param>
+    /// <returns>The matching entry, or the fallback.</returns>
+    public static string Find(string key, string fallback) => fallback;
+
+    /// <summary>Finds an entry by its numeric id.</summary>
+    /// <inheritdoc cref="Find(string, string)"/>
+    public static string Find(int id, string fallback) => fallback;
+}
+
+/// <summary>
+/// A façade whose public method inherits documentation, by cref, from a <b>private</b> helper that is not part of the
+/// documented surface — so resolution must go through the compilation, not the rendered pages.
+/// </summary>
+public static class Facade
+{
+    /// <summary>Computes a result for the given input.</summary>
+    /// <param name="input">The value to process.</param>
+    /// <returns>The computed result.</returns>
+    private static int Compute(int input) => input;
+
+    /// <inheritdoc cref="Compute(int)"/>
+    public static int Run(int input) => Compute(input);
+}
+
+/// <summary>A type whose ToString has its own summary plus an unresolvable <c>&lt;inheritdoc/&gt;</c>.</summary>
+public sealed class Tag
+{
+    /// <summary>Returns the tag's text.</summary>
+    /// <inheritdoc/>
+    public override string ToString() => string.Empty;
+}

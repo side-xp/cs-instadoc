@@ -33,7 +33,8 @@ public sealed class DocumentationGenerator
         cancellationToken.ThrowIfCancellationRequested();
 
         // Render one Markdown page per type (pulling and converting doc comments), then write them out.
-        var pages = new DocumentationRenderer().Render(surface, options.Index, options.Grouping, cancellationToken);
+        var pages = new DocumentationRenderer()
+            .Render(surface, options.Index, options.Grouping, compilation, cancellationToken);
         // Namespace grouping writes into subfolders, so stale-output cleanup must reach them too.
         var recurseCleanup = options.Grouping == Grouping.Namespace;
         var filesWritten = WritePages(pages, options.Output, options.Clean, recurseCleanup, cancellationToken);
