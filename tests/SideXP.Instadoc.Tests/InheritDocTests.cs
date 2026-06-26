@@ -160,10 +160,23 @@ public class InheritDocTests
     {
         var page = Page(RenderInheritanceFixture(), "Sample.Inheritance.Facade.md");
 
-        // Facade.Run inherits from the private Compute(int): resolution goes through the compilation, not the surface.
+        // Facade.Run inherits from the private Compute(int): resolution goes through the source index, not the surface.
         Assert.Contains("Computes a result for the given input.", page);
         Assert.Contains("The value to process.", page);
         Assert.Contains("The computed result.", page);
+    }
+
+    [Fact(DisplayName = "Resolves a cref whose signature names an unresolvable type")]
+    public void Resolves_cref_with_unresolvable_parameter_type()
+    {
+        var page = Page(RenderInheritanceFixture(), "Sample.Inheritance.Registry.md");
+        var register = Section(page, "Register(int, RegistrationOptions)");
+
+        // The cref signature uses the undefined RegistrationOptions; matching by doc-id resolves it anyway.
+        Assert.Contains("Registers by id.", register);            // own summary
+        Assert.Contains("The registration options.", register);   // inherited shared param
+        Assert.Contains("True on success.", register);            // inherited returns
+        Assert.DoesNotContain("The registration name.", register); // source's `name` param filtered out
     }
 
     [Fact(DisplayName = "No fallback note when the member already has its own documentation")]

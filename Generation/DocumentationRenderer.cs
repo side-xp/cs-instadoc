@@ -81,6 +81,9 @@ public sealed partial class DocumentationRenderer
         // resolves correctly regardless of which folder the linking page lives in.
         var pageMap = BuildPageMap(surface, grouping);
 
+        // Index the sources by doc-comment id once, so cref-qualified <inheritdoc> can be resolved per member.
+        var sourceMembers = compilation is null ? null : InheritDocResolver.IndexSourceMembers(compilation);
+
         var pages = new List<RenderedPage>(surface.Count + 1);
         foreach (var type in surface)
         {
@@ -90,7 +93,7 @@ public sealed partial class DocumentationRenderer
             pages.Add(new RenderedPage
             {
                 RelativePath = path,
-                Content = RenderType(type, converter, compilation),
+                Content = RenderType(type, converter, sourceMembers),
             });
         }
 
@@ -162,7 +165,10 @@ public sealed partial class DocumentationRenderer
     /// <summary>
     /// Renders one type's page: header, signature, type docs, then grouped members.
     /// </summary>
-    private string RenderType(DocumentedType type, DocCommentMarkdownConverter converter, Compilation? compilation)
+    private string RenderType(
+        DocumentedType type,
+        DocCommentMarkdownConverter converter,
+        IReadOnlyDictionary<string, ISymbol>? sourceMembers)
     {
         var sb = new StringBuilder();
 
@@ -175,7 +181,7 @@ public sealed partial class DocumentationRenderer
 
         sb.Append("```csharp\n").Append(TypeSignature(type.Symbol)).Append("\n```\n\n");
 
-        AppendDoc(sb, type.Symbol, converter, compilation);
+        AppendDoc(sb, type.Symbol, converter, sourceMembers);
 
         foreach (var (title, predicate) in MemberGroups)
         {
@@ -191,7 +197,7 @@ public sealed partial class DocumentationRenderer
                 sb.Append("### ").Append(member.ToDisplayString(MemberTitle)).Append("\n\n");
                 sb.Append("<a id=\"").Append(AnchorFor(member)).Append("\"></a>\n\n");
                 sb.Append("```csharp\n").Append(member.ToDisplayString(MemberSignature)).Append("\n```\n\n");
-                AppendDoc(sb, member, converter, compilation);
+                AppendDoc(sb, member, converter, sourceMembers);
             }
         }
 
@@ -205,7 +211,7 @@ public sealed partial class DocumentationRenderer
         StringBuilder sb,
         ISymbol symbol,
         DocCommentMarkdownConverter converter,
-        Compilation? compilation)
+        IReadOnlyDictionary<string, ISymbol>? sourceMembers)
     {
         var doc = _reader.Read(symbol);
         if (doc is null)
@@ -214,7 +220,7 @@ public sealed partial class DocumentationRenderer
         }
 
         // Expand a top-level <inheritdoc/> (cref-named, else the overridden/implemented member) before converting.
-        doc = _inheritDoc.Resolve(symbol, doc, compilation);
+        doc = _inheritDoc.Resolve(symbol, doc, sourceMembers);
 
         var body = converter.Convert(doc);
         if (body.Length > 0)

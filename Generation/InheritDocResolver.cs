@@ -31,13 +31,14 @@ public sealed class InheritDocResolver
     /// </summary>
     /// <param name="symbol">The symbol the documentation belongs to.</param>
     /// <param name="doc">The parsed <c>&lt;member&gt;</c> element (from <see cref="DocCommentReader"/>).</param>
-    /// <param name="compilation">Used to resolve a <c>cref</c>-named source to its symbol; pass <see langword="null"/> to
+    /// <param name="sourceMembers">Documentation-id → symbol index of the analyzed sources (from
+    /// <see cref="IndexSourceMembers"/>), used to resolve a <c>cref</c>-named source; pass <see langword="null"/> to
     /// resolve only the override/interface source.</param>
     /// <param name="cancellationToken">Honored while reading the inherited symbol's documentation.</param>
     public XElement Resolve(
         ISymbol symbol,
         XElement doc,
-        Compilation? compilation = null,
+        IReadOnlyDictionary<string, ISymbol>? sourceMembers = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(symbol);
@@ -50,7 +51,7 @@ public sealed class InheritDocResolver
         }
 
         // An explicit cref names the source; otherwise inherit from the overridden/implemented member.
-        var source = ResolveCref(inheritdoc, compilation) ?? FindInheritanceSource(symbol);
+        var source = ResolveCref(inheritdoc, sourceMembers) ?? FindInheritanceSource(symbol);
         var sourceDoc = source is null ? null : _reader.Read(source, cancellationToken);
 
         // Only concrete tags can be inherited; an inherited <inheritdoc/> is not followed (no recursion in v1).
@@ -81,18 +82,71 @@ public sealed class InheritDocResolver
 
     /// <summary>
     /// Resolves the member named by an <c>&lt;inheritdoc cref="..."/&gt;</c> to its symbol, or <see langword="null"/>
-    /// when there is no (resolvable) cref or no compilation to resolve it against. Roslyn has already turned the cref
-    /// into a documentation ID (eg. <c>M:N.T.M(System.Int32)</c>), or <c>!:</c> when it couldn't be bound.
+    /// when there is no (resolvable) cref or no source index to resolve it against.
     /// </summary>
-    private static ISymbol? ResolveCref(XElement inheritdoc, Compilation? compilation)
+    /// <remarks>
+    /// Roslyn turns the cref into a documentation id (eg. <c>M:N.T.M(System.Int32)</c>), or <c>!:</c> when it couldn't
+    /// be bound at all. Crucially, a parameter type that isn't in the reference set is written by its bare name (eg.
+    /// <c>CodeNamespace</c>) — identical to how the *target* member's own <see cref="ISymbol.GetDocumentationCommentId"/>
+    /// renders it. So matching the cref id against the source index resolves the reference without needing the type to
+    /// be resolvable, which is what keeps this working for sources that reference assemblies the tool never loads.
+    /// </remarks>
+    private static ISymbol? ResolveCref(XElement inheritdoc, IReadOnlyDictionary<string, ISymbol>? sourceMembers)
     {
         var cref = inheritdoc.Attribute("cref")?.Value;
-        if (compilation is null || string.IsNullOrEmpty(cref) || cref.StartsWith("!:", StringComparison.Ordinal))
+        if (sourceMembers is null || string.IsNullOrEmpty(cref))
         {
             return null;
         }
 
-        return DocumentationCommentId.GetFirstSymbolForDeclarationId(cref, compilation);
+        return sourceMembers.TryGetValue(cref, out var symbol) ? symbol : null;
+    }
+
+    /// <summary>
+    /// Indexes every type and member declared in <paramref name="compilation"/>'s sources by its documentation comment
+    /// id, so a <c>cref</c> can be resolved by matching ids (see <see cref="ResolveCref"/>). Members defined only in
+    /// referenced metadata are skipped — they have no XML to inherit here anyway.
+    /// </summary>
+    public static IReadOnlyDictionary<string, ISymbol> IndexSourceMembers(Compilation compilation)
+    {
+        ArgumentNullException.ThrowIfNull(compilation);
+
+        var index = new Dictionary<string, ISymbol>(StringComparer.Ordinal);
+        var pending = new Stack<INamespaceOrTypeSymbol>();
+        pending.Push(compilation.GlobalNamespace);
+
+        while (pending.Count > 0)
+        {
+            foreach (var member in pending.Pop().GetMembers())
+            {
+                switch (member)
+                {
+                    case INamespaceSymbol @namespace:
+                        pending.Push(@namespace);
+                        break;
+
+                    // Only types declared in source can contribute inheritable docs; metadata types are skipped.
+                    case INamedTypeSymbol type when !type.DeclaringSyntaxReferences.IsEmpty:
+                        Add(index, type);
+                        pending.Push(type);
+                        break;
+
+                    case not INamedTypeSymbol:
+                        Add(index, member);
+                        break;
+                }
+            }
+        }
+
+        return index;
+
+        static void Add(Dictionary<string, ISymbol> index, ISymbol symbol)
+        {
+            if (symbol.GetDocumentationCommentId() is { } id)
+            {
+                index.TryAdd(id, symbol);
+            }
+        }
     }
 
     /// <summary>

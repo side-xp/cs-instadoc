@@ -134,3 +134,21 @@ public sealed class Tag
     /// <inheritdoc/>
     public override string ToString() => string.Empty;
 }
+
+/// <summary>
+/// Overloads whose cref signature names a type the tool cannot resolve (<c>RegistrationOptions</c> is intentionally
+/// undefined, like a third-party type with no reference). The cref must still resolve by matching documentation ids, so
+/// the unresolved type written as a bare name doesn't break inheritance.
+/// </summary>
+public static class Registry
+{
+    /// <summary>Registers by name.</summary>
+    /// <param name="name">The registration name.</param>
+    /// <param name="options">The registration options.</param>
+    /// <returns>True on success.</returns>
+    public static bool Register(string name, RegistrationOptions options) => false;
+
+    /// <summary>Registers by id.</summary>
+    /// <inheritdoc cref="Register(string, RegistrationOptions)"/>
+    public static bool Register(int id, RegistrationOptions options) => false;
+}
