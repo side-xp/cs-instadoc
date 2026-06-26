@@ -33,8 +33,10 @@ public sealed class DocumentationGenerator
         cancellationToken.ThrowIfCancellationRequested();
 
         // Render one Markdown page per type (pulling and converting doc comments), then write them out.
-        var pages = new DocumentationRenderer().Render(surface, options.Index, cancellationToken);
-        var filesWritten = WritePages(pages, options.Output, options.Clean, cancellationToken);
+        var pages = new DocumentationRenderer().Render(surface, options.Index, options.Grouping, cancellationToken);
+        // Namespace grouping writes into subfolders, so stale-output cleanup must reach them too.
+        var recurseCleanup = options.Grouping == Grouping.Namespace;
+        var filesWritten = WritePages(pages, options.Output, options.Clean, recurseCleanup, cancellationToken);
 
         return new GenerationResult
         {
@@ -53,13 +55,14 @@ public sealed class DocumentationGenerator
         IReadOnlyList<RenderedPage> pages,
         string outputFolder,
         bool clean,
+        bool recurseCleanup,
         CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(outputFolder);
 
         if (clean)
         {
-            ClearStaleOutput(outputFolder, cancellationToken);
+            ClearStaleOutput(outputFolder, recurseCleanup, cancellationToken);
         }
 
         var written = new List<string>(pages.Count);
@@ -82,23 +85,47 @@ public sealed class DocumentationGenerator
     }
 
     /// <summary>
-    /// Deletes the Markdown files at the top level of the output folder before a fresh write, so that types renamed
-    /// or removed since the last run don't linger as orphans.
+    /// Deletes Markdown files left in the output folder before a fresh write, so that types renamed or removed since
+    /// the last run don't linger as orphans. With <paramref name="recurse"/> set (namespace grouping), per-namespace
+    /// subfolders are swept too, and any folder left empty afterwards is removed.
     /// </summary>
     /// <remarks>
-    /// Scoped deliberately: only <c>*.md</c> files, only at the top level (the tool writes a flat folder), so non-Markdown
-    /// content and nested folders the user keeps alongside the output are left untouched. The extension is re-checked
+    /// Scoped deliberately to <c>*.md</c> files, so non-Markdown content the user keeps alongside the output is left
+    /// untouched. In flat layout only the top level is swept, leaving nested folders alone. The extension is re-checked
     /// because the <c>*.md</c> search pattern is matched by the OS rather than by us.
     /// </remarks>
-    private static void ClearStaleOutput(string outputFolder, CancellationToken cancellationToken)
+    private static void ClearStaleOutput(string outputFolder, bool recurse, CancellationToken cancellationToken)
     {
-        var stale = Directory.EnumerateFiles(outputFolder, "*.md", SearchOption.TopDirectoryOnly)
-            .Where(path => path.EndsWith(".md", StringComparison.OrdinalIgnoreCase));
+        var search = recurse ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+
+        var stale = Directory.EnumerateFiles(outputFolder, "*.md", search)
+            .Where(path => path.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
         foreach (var path in stale)
         {
             cancellationToken.ThrowIfCancellationRequested();
             File.Delete(path);
+        }
+
+        if (!recurse)
+        {
+            return;
+        }
+
+        // Remove folders emptied by the sweep (eg. a namespace that no longer has any types), deepest first so a
+        // parent left empty by its children's removal is caught in the same pass. The output root itself is kept.
+        var directories = Directory.EnumerateDirectories(outputFolder, "*", SearchOption.AllDirectories)
+            .OrderByDescending(path => path.Length)
+            .ToList();
+
+        foreach (var directory in directories)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!Directory.EnumerateFileSystemEntries(directory).Any())
+            {
+                Directory.Delete(directory);
+            }
         }
     }
 

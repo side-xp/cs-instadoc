@@ -62,46 +62,52 @@ public sealed partial class DocumentationRenderer
     /// </summary>
     /// <param name="surface">The selected types and members (eg. from <see cref="ApiSurfaceExtractor"/>).</param>
     /// <param name="includeIndex">When <see langword="true"/>, also produce an <c>index.md</c> page.</param>
+    /// <param name="grouping">How type pages are laid out under the output folder (see <see cref="Grouping"/>).</param>
     /// <param name="cancellationToken">Honored between pages.</param>
     /// <returns>One page per type, plus the index page when requested.</returns>
     public IReadOnlyList<RenderedPage> Render(
         IReadOnlyList<DocumentedType> surface,
         bool includeIndex,
+        Grouping grouping = Grouping.None,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(surface);
 
-        var pageMap = BuildPageMap(surface);
-        var converter = new DocCommentMarkdownConverter(CreateResolver(pageMap));
+        // The page map holds output-root-relative paths; links are relativized per page below, so a reference
+        // resolves correctly regardless of which folder the linking page lives in.
+        var pageMap = BuildPageMap(surface, grouping);
 
         var pages = new List<RenderedPage>(surface.Count + 1);
         foreach (var type in surface)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var path = FileNameFor(type.Symbol, grouping);
+            var converter = new DocCommentMarkdownConverter(CreateResolver(pageMap, path));
             pages.Add(new RenderedPage
             {
-                RelativePath = FileNameFor(type.Symbol),
+                RelativePath = path,
                 Content = RenderType(type, converter),
             });
         }
 
         if (includeIndex)
         {
-            pages.Add(new RenderedPage { RelativePath = "index.md", Content = RenderIndex(surface) });
+            pages.Add(new RenderedPage { RelativePath = "index.md", Content = RenderIndex(surface, grouping) });
         }
 
         return pages;
     }
 
     /// <summary>
-    /// Maps each documented type and member doc-comment ID to its page (and member anchor).
+    /// Maps each documented type and member doc-comment ID to its page (and member anchor), as an output-root-relative
+    /// path. Links are relativized against the linking page at render time.
     /// </summary>
-    private static Dictionary<string, string> BuildPageMap(IReadOnlyList<DocumentedType> surface)
+    private static Dictionary<string, string> BuildPageMap(IReadOnlyList<DocumentedType> surface, Grouping grouping)
     {
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var type in surface)
         {
-            var file = FileNameFor(type.Symbol);
+            var file = FileNameFor(type.Symbol, grouping);
             var typeId = type.Symbol.GetDocumentationCommentId();
             if (typeId is not null)
             {
@@ -122,12 +128,32 @@ public sealed partial class DocumentationRenderer
     }
 
     /// <summary>
-    /// A cref resolver that links to documented pages, falling back to inline code for anything unmapped.
+    /// A cref resolver that links to documented pages, falling back to inline code for anything unmapped. Targets in
+    /// <paramref name="pageMap"/> are output-root-relative and relativized against <paramref name="fromPage"/>.
     /// </summary>
-    private static CrefResolver CreateResolver(IReadOnlyDictionary<string, string> pageMap)
-        => (crefId, displayText) => pageMap.TryGetValue(crefId, out var link)
-            ? $"[{displayText ?? DocCommentMarkdownConverter.SimpleNameFromId(crefId)}]({link})"
+    private static CrefResolver CreateResolver(IReadOnlyDictionary<string, string> pageMap, string fromPage)
+        => (crefId, displayText) => pageMap.TryGetValue(crefId, out var target)
+            ? $"[{displayText ?? DocCommentMarkdownConverter.SimpleNameFromId(crefId)}]({RelativeLink(fromPage, target)})"
             : DocCommentMarkdownConverter.DefaultCrefResolver(crefId, displayText);
+
+    /// <summary>
+    /// Rewrites an output-root-relative link target (<c>folder/File.md#anchor</c>) as a path relative to the folder of
+    /// the page doing the linking, using forward slashes (the only separator valid in Markdown links). In flat
+    /// (<see cref="Grouping.None"/>) layout, where every page sits at the root, this returns the target unchanged.
+    /// </summary>
+    private static string RelativeLink(string fromPage, string target)
+    {
+        var hash = target.IndexOf('#');
+        var targetPath = hash >= 0 ? target[..hash] : target;
+        var anchor = hash >= 0 ? target[hash..] : string.Empty;
+
+        var fromDirectory = Path.GetDirectoryName(fromPage);
+        var relative = string.IsNullOrEmpty(fromDirectory)
+            ? targetPath
+            : Path.GetRelativePath(fromDirectory, targetPath).Replace('\\', '/');
+
+        return relative + anchor;
+    }
 
     /// <summary>
     /// Renders one type's page: header, signature, type docs, then grouped members.
@@ -187,9 +213,10 @@ public sealed partial class DocumentationRenderer
     }
 
     /// <summary>
-    /// Renders the index page: every documented type, grouped by namespace and linked to its page.
+    /// Renders the index page: every documented type, grouped by namespace and linked to its page. The index sits at
+    /// the output root, so the page map's root-relative paths are already correct links from here.
     /// </summary>
-    private static string RenderIndex(IReadOnlyList<DocumentedType> surface)
+    private static string RenderIndex(IReadOnlyList<DocumentedType> surface, Grouping grouping)
     {
         var sb = new StringBuilder();
         sb.Append("# API Reference\n\n");
@@ -212,7 +239,7 @@ public sealed partial class DocumentationRenderer
                 sb.Append("- [")
                     .Append(type.Symbol.ToDisplayString(NameWithGenerics))
                     .Append("](")
-                    .Append(FileNameFor(type.Symbol))
+                    .Append(FileNameFor(type.Symbol, grouping))
                     .Append(")\n");
             }
             sb.Append('\n');
@@ -294,12 +321,29 @@ public sealed partial class DocumentationRenderer
         _ => string.Empty,
     };
 
-    /// <summary>The Markdown file name for a type, derived from its doc-comment ID (eg. <c>Sample.Shapes.Circle.md</c>).</summary>
-    private static string FileNameFor(INamedTypeSymbol type)
+    /// <summary>
+    /// The output-root-relative Markdown path for a type, derived from its doc-comment ID. Flat
+    /// (<see cref="Grouping.None"/>): the full type name at the root (eg. <c>Sample.Shapes.Circle.md</c>). By
+    /// namespace: a per-namespace folder with the namespace prefix stripped from the file name but the nested-type
+    /// chain kept (eg. <c>Sample.Shapes/Circle.md</c>); global-namespace types stay at the root.
+    /// </summary>
+    private static string FileNameFor(INamedTypeSymbol type, Grouping grouping)
     {
         var id = type.GetDocumentationCommentId() ?? $"T:{type.Name}";
-        var name = id.StartsWith("T:", StringComparison.Ordinal) ? id[2..] : id;
-        return name.Replace('`', '-') + ".md";
+        var fullName = id.StartsWith("T:", StringComparison.Ordinal) ? id[2..] : id;
+        // Generic arity markers (`Foo`1`) aren't valid in file names.
+        fullName = fullName.Replace('`', '-');
+
+        if (grouping != Grouping.Namespace || type.ContainingNamespace.IsGlobalNamespace)
+        {
+            return fullName + ".md";
+        }
+
+        // The namespace prefix is never affected by the backtick replacement above (it has no generic arity), so its
+        // length still indexes into fullName correctly. Strip "Namespace." to leave the (possibly nested) type chain.
+        var @namespace = type.ContainingNamespace.ToDisplayString();
+        var withinNamespace = fullName[(@namespace.Length + 1)..];
+        return $"{@namespace}/{withinNamespace}.md";
     }
 
     /// <summary>A stable, per-symbol anchor slug (eg. <c>Add(int, int)</c> → <c>add-int-int</c>).</summary>

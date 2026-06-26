@@ -38,6 +38,10 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
         [Description("Keep existing files in the output folder. By default, stale .md files are cleared before writing.")]
         public bool NoClean { get; init; }
 
+        [CommandOption("--grouping <MODE>")]
+        [Description("Output layout: none (flat, default) or namespace (one folder per namespace).")]
+        public string Grouping { get; init; } = "none";
+
         /// <inheritdoc cref="CommandSettings.Validate"/>
         public override ValidationResult Validate()
         {
@@ -49,6 +53,12 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
             if (string.IsNullOrWhiteSpace(Output))
             {
                 return ValidationResult.Error("--output must not be empty.");
+            }
+
+            if (!Enum.TryParse<Generation.Grouping>(Grouping, ignoreCase: true, out var grouping)
+                || !Enum.IsDefined(grouping))
+            {
+                return ValidationResult.Error("--grouping must be one of: none, namespace.");
             }
 
             return ValidationResult.Success();
@@ -67,6 +77,7 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
             Exclude = settings.Exclude,
             Index = settings.Index,
             Clean = !settings.NoClean,
+            Grouping = Enum.Parse<Generation.Grouping>(settings.Grouping, ignoreCase: true),
         };
 
         var table = new Table().Border(TableBorder.Rounded);
@@ -78,6 +89,7 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
         table.AddRow("Exclude", options.Exclude.Count == 0 ? "[dim](none)[/]" : string.Join("\n", options.Exclude));
         table.AddRow("Index", options.Index ? "yes" : "no");
         table.AddRow("Clean output", options.Clean ? "yes" : "no");
+        table.AddRow("Grouping", options.Grouping.ToString().ToLowerInvariant());
         AnsiConsole.Write(table);
 
         var generator = new DocumentationGenerator();

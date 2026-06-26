@@ -37,6 +37,12 @@ public sealed record GeneratorOptions
     public bool Index { get; init; }
 
     /// <summary>
+    /// How type pages are laid out under <see cref="Output"/>. Defaults to <see cref="Generation.Grouping.None"/>
+    /// (a flat folder); <see cref="Generation.Grouping.Namespace"/> places each type page in a per-namespace folder.
+    /// </summary>
+    public Grouping Grouping { get; init; } = Grouping.None;
+
+    /// <summary>
     /// When <see langword="true"/> (the default), stale Markdown is cleared from the output folder before writing, so
     /// renamed or removed types don't linger as orphans. Set to <see langword="false"/> to leave existing files in
     /// place; pages that match this run's output are overwritten regardless.
