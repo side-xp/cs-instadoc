@@ -41,6 +41,13 @@ public sealed partial class DocCommentMarkdownConverter
 
         var sb = new StringBuilder();
 
+        // A top-level <inheritdoc/> still present here is one the resolver could not expand (no documented own-source
+        // ancestor): render a short note rather than a blank body.
+        if (member.Element("inheritdoc") is not null)
+        {
+            sb.Append("*Inherited documentation.*\n\n");
+        }
+
         AppendSection(sb, member.Element("summary"), heading: null);
         AppendNamedList(sb, member.Elements("typeparam"), "Type parameters");
         AppendNamedList(sb, member.Elements("param"), "Parameters");

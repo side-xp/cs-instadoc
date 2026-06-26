@@ -56,6 +56,7 @@ public sealed partial class DocumentationRenderer
     ];
 
     private readonly DocCommentReader _reader = new();
+    private readonly InheritDocResolver _inheritDoc = new();
 
     /// <summary>
     /// Renders the API surface into Markdown pages.
@@ -204,6 +205,9 @@ public sealed partial class DocumentationRenderer
         {
             return;
         }
+
+        // Expand a top-level <inheritdoc/> from the overridden/implemented member before converting.
+        doc = _inheritDoc.Resolve(symbol, doc);
 
         var body = converter.Convert(doc);
         if (body.Length > 0)
