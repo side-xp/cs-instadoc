@@ -78,6 +78,17 @@ public class DocumentationRendererTests
         Assert.Contains("<a id=\"area\"></a>", circle);
     }
 
+    [Fact(DisplayName = "Expands a member's <inheritdoc/> from the interface it implements")]
+    public void Expands_inheritdoc_from_implemented_interface()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        // Circle.Area() carries only <inheritdoc/>; it implements IShape.Area(), whose summary should now show.
+        var circle = Page(pages, "Sample.Shapes.Circle.md");
+        Assert.Contains("### Area()", circle);
+        Assert.Contains("Computes the area of the shape.", circle);
+    }
+
     [Fact(DisplayName = "The index groups types by namespace and links them")]
     public void Index_groups_and_links_types()
     {
