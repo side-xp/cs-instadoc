@@ -16,8 +16,8 @@ public enum Grouping
     None,
 
     /// <summary>
-    /// One folder per namespace, named with the full dotted namespace and <b>non-recursive</b> — <c>A.B</c> and
-    /// <c>A.B.C</c> are sibling folders, not nested — with that namespace's type pages inside (named by the type's
+    /// One folder per namespace, named with the full dotted namespace and <b>non-recursive</b> (<c>A.B</c> and
+    /// <c>A.B.C</c> are sibling folders, not nested) with that namespace's type pages inside (named by the type's
     /// name with the namespace prefix stripped but the nested-type chain kept). Global-namespace types stay at the root.
     /// </summary>
     Namespace,

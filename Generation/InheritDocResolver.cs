@@ -13,7 +13,7 @@ namespace SideXP.Instadoc.Generation;
 /// Tags the member declares itself win; the inherited tags fill the gaps, matched per key
 /// (<c>param</c>/<c>typeparam</c> by <c>name</c>, <c>exception</c>/<c>seealso</c> by <c>cref</c>, and the singleton
 /// sections like <c>summary</c> or <c>returns</c>) by tag. Inherited <c>param</c>/<c>typeparam</c> tags are kept only
-/// when the target actually has a parameter of that name — a <c>cref</c> source may have a different signature, so its
+/// when the target actually has a parameter of that name. A <c>cref</c> source may have a different signature, so its
 /// extra parameters must not leak in.
 /// When no source with concrete documentation is found (eg. the ancestor is a BCL or third-party type whose XML isn't
 /// loaded here, or a base that itself only carries <c>&lt;inheritdoc/&gt;</c>), the tag is left in place and the
@@ -27,7 +27,7 @@ public sealed class InheritDocResolver
 
     /// <summary>
     /// Returns <paramref name="doc"/> with a top-level <c>&lt;inheritdoc/&gt;</c> expanded in place, or unchanged when
-    /// there is none — or when none can be resolved to a documented own-source member.
+    /// there is none, or when none can be resolved to a documented own-source member.
     /// </summary>
     /// <param name="symbol">The symbol the documentation belongs to.</param>
     /// <param name="doc">The parsed <c>&lt;member&gt;</c> element (from <see cref="DocCommentReader"/>).</param>
@@ -75,7 +75,7 @@ public sealed class InheritDocResolver
         }
 
         // A documented source was found, so the tag is resolved even if every inherited tag was already present or
-        // filtered out — remove it so no spurious fallback note is produced.
+        // filtered out. Remove it so no spurious fallback note is produced.
         inheritdoc.Remove();
         return doc;
     }
@@ -87,8 +87,8 @@ public sealed class InheritDocResolver
     /// <remarks>
     /// Roslyn turns the cref into a documentation id (eg. <c>M:N.T.M(System.Int32)</c>), or <c>!:</c> when it couldn't
     /// be bound at all. Crucially, a parameter type that isn't in the reference set is written by its bare name (eg.
-    /// <c>CodeNamespace</c>) — identical to how the *target* member's own <see cref="ISymbol.GetDocumentationCommentId"/>
-    /// renders it. So matching the cref id against the source index resolves the reference without needing the type to
+    /// <c>CodeNamespace</c>) (identical to how the *target* member's own <see cref="ISymbol.GetDocumentationCommentId"/>
+    /// renders it). So matching the cref id against the source index resolves the reference without needing the type to
     /// be resolvable, which is what keeps this working for sources that reference assemblies the tool never loads.
     /// </remarks>
     private static ISymbol? ResolveCref(XElement inheritdoc, IReadOnlyDictionary<string, ISymbol>? sourceMembers)
@@ -105,7 +105,7 @@ public sealed class InheritDocResolver
     /// <summary>
     /// Indexes every type and member declared in <paramref name="compilation"/>'s sources by its documentation comment
     /// id, so a <c>cref</c> can be resolved by matching ids (see <see cref="ResolveCref"/>). Members defined only in
-    /// referenced metadata are skipped — they have no XML to inherit here anyway.
+    /// referenced metadata are skipped (they have no XML to inherit here anyway).
     /// </summary>
     public static IReadOnlyDictionary<string, ISymbol> IndexSourceMembers(Compilation compilation)
     {

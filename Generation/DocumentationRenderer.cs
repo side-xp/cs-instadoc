@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis;
 namespace SideXP.Instadoc.Generation;
 
 /// <summary>
-/// Step 7 of the pipeline: renders the selected API surface into Markdown pages — one per type, plus an optional index.
+/// Step 7 of the pipeline: renders the selected API surface into Markdown pages (one per type, plus an optional index).
 /// </summary>
 /// <remarks>
 /// Rendering happens in two passes. First a map from every documented symbol's doc-comment ID to its page (and member

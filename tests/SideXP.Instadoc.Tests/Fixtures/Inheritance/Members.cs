@@ -66,7 +66,7 @@ public abstract class CommandBase
 
 /// <summary>
 /// Re-documents a single parameter while inheriting the summary, the other parameter and the return value. This is the
-/// "replace the text of one parameter" case — the merge must work per-parameter, not all-or-nothing.
+/// "replace the text of one parameter" case (the merge must work per-parameter, not all-or-nothing).
 /// </summary>
 public sealed class RewriteCommand : CommandBase
 {
@@ -96,7 +96,7 @@ public sealed class CountingCommand : CommandBase
 }
 
 /// <summary>
-/// Overloads that reuse documentation via <c>&lt;inheritdoc cref="..."/&gt;</c> — pointing at a sibling overload rather
+/// Overloads that reuse documentation via <c>&lt;inheritdoc cref="..."/&gt;</c>, pointing at a sibling overload rather
 /// than overriding or implementing anything.
 /// </summary>
 public static class Lookup
@@ -114,7 +114,7 @@ public static class Lookup
 
 /// <summary>
 /// A façade whose public method inherits documentation, by cref, from a <b>private</b> helper that is not part of the
-/// documented surface — so resolution must go through the compilation, not the rendered pages.
+/// documented surface, so resolution must go through the compilation, not the rendered pages.
 /// </summary>
 public static class Facade
 {

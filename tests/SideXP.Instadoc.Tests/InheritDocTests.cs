@@ -4,15 +4,15 @@ namespace SideXP.Instadoc.Tests;
 
 /// <summary>
 /// Tests for <c>&lt;inheritdoc/&gt;</c> resolution (todo 1.1): a member documented only with <c>&lt;inheritdoc/&gt;</c>
-/// should render the documentation of the member it overrides or the interface member it implements — one level up,
-/// within the analyzed sources only — and fall back to a short note when no source for the docs can be found.
+/// should render the documentation of the member it overrides or the interface member it implements (one level up,
+/// within the analyzed sources only) and fall back to a short note when no source for the docs can be found.
 /// </summary>
 /// <remarks>
 /// The fixture <c>Fixtures/Inheritance/Members.cs</c> carries the scenarios:
 /// <list type="bullet">
-/// <item><c>Widget.Refresh</c> / <c>Widget.Name</c> — override a documented abstract base member.</item>
-/// <item><c>PressureGauge.Reading</c> / <c>PressureGauge.Reset</c> — implement a documented interface member.</item>
-/// <item><c>Widget.ToString</c> — overrides <c>object.ToString()</c> (no XML in our sources): the fallback case.</item>
+/// <item><c>Widget.Refresh</c> / <c>Widget.Name</c>: override a documented abstract base member.</item>
+/// <item><c>PressureGauge.Reading</c> / <c>PressureGauge.Reset</c>: implement a documented interface member.</item>
+/// <item><c>Widget.ToString</c>: overrides <c>object.ToString()</c> (no XML in our sources): the fallback case.</item>
 /// </list>
 /// The assertions are made on the rendered page, so they describe the user-visible outcome rather than any particular
 /// resolver API.

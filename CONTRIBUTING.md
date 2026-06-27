@@ -9,7 +9,7 @@ At Sideways Experiments, we hate doing the same thing more than once, and we lov
 ### Prerequisites
 
 - **[.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0)** or newer (the project targets `net10.0`). Verify your install with `dotnet --version`.
-- **Git** — for cloning, and so [MinVer](https://github.com/adamralph/minver) can derive the package version from `vX.Y.Z` tags.
+- **Git**: for cloning, and so [MinVer](https://github.com/adamralph/minver) can derive the package version from `vX.Y.Z` tags.
 - An editor with C# support: Visual Studio, VS Code with the C# Dev Kit, or JetBrains Rider.
 
 ### Get the sources
@@ -48,9 +48,20 @@ Or scan the whole project in one pass, skipping build output:
 dotnet run -- --input . --exclude "**/bin/**" --exclude "**/obj/**" --output ./docs/api --index
 ```
 
+### Run the tests
+
+The test suite lives under `tests/SideXP.Instadoc.Tests`. Run it from the repository root:
+
+```sh
+dotnet test            # builds and runs every test
+dotnet test --nologo   # quieter output
+```
+
+All tests must pass before a pull request can be merged (the CI workflow runs them on every push and PR).
+
 ### As an installed tool (packaging)
 
-To verify the packaging itself — the `instadoc` command name and tool startup — pack the project and install it as a global tool from that local folder:
+To verify the packaging itself (the `instadoc` command name and tool startup ) pack the project and install it as a global tool from that local folder:
 
 ```sh
 dotnet pack -c Release -o ./nupkg
@@ -100,9 +111,10 @@ To contribute code:
 2. Create a **new branch** off `develop`
 3. Make your changes and commit them
    - **Signed commits** are required
+   - Commits follow [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `docs:`, `test:`, …); the release tooling reads these to build the changelog and pick the next version
    - Take care to follow our [commit message guidelines](https://github.com/side-xp/.github/blob/main/docs/coding-style/commit-messages.md)
-4. Test your changes locally
-5. Submit a **pull request targeting `develop` or `dev`**, not `master` or `main`
+4. Test your changes locally (`dotnet test`)
+5. Submit a **pull request targeting `develop`**, not `main`
 6. Describe your changes and reference any related issues
 7. A member of the ***Sideways Experiments* core team** will review it
 
@@ -118,17 +130,19 @@ As mentioned in the *Suggesting enhancements or features* section, please don't 
 
 ## Releases
 
-Releases are generated based on `vX.Y.Z` tags pushed to the repository.
+Releases are automated with [Release Please](https://github.com/googleapis/release-please) and run entirely in CI:
 
-Each release will include a compiled package and changelog.
+1. Conventional commits merged into `main` make Release Please open (or update) a **release pull request** that bumps the changelog and version.
+2. Merging that release PR creates the `vX.Y.Z` git tag and a GitHub Release.
+3. The publish workflow fires on that release, packs the project, and pushes it to nuget.org.
 
-We currently do **not** require contributors to handle release generation — this is done internally.
+Each release includes a compiled package and a changelog entry. Contributors do **not** push tags or handle release generation, just write conventional commit messages and the tooling does the rest.
 
 ## License and Contributor Agreement
 
 Most of our projects are licensed under the [MIT License](https://mit-license.org).
 
-A `LICENSE.md` file is always included in our projects' repository root, and all contributions to a specific project will be licensed under the same terms as that file.
+A `LICENSE` file is always included in our projects' repository root, and all contributions to a specific project will be licensed under the same terms as that file.
 
 We will evaluate whether a Contributor License Agreement (CLA) is required in the future, as the projects go. For now, you can contribute freely under MIT.
 

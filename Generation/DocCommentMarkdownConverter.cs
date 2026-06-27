@@ -54,7 +54,7 @@ public sealed partial class DocCommentMarkdownConverter
         var body = sb.ToString().Trim();
 
         // A residual top-level <inheritdoc/> is one the resolver could not expand. Only note it when the member has no
-        // documentation of its own — otherwise the note is just noise on top of real content.
+        // documentation of its own (otherwise the note is just noise on top of real content).
         if (body.Length == 0 && member.Element("inheritdoc") is not null)
         {
             return "*Inherited documentation.*";
