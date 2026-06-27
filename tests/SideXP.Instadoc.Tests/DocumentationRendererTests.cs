@@ -1,0 +1,185 @@
+using SideXP.Instadoc.Generation;
+
+namespace SideXP.Instadoc.Tests;
+
+/// <summary>
+/// Tests for <see cref="DocumentationRenderer"/>: one page per type, an optional index, resolved cross-reference links,
+/// and per-member anchors, all asserted on the rendered strings, without touching disk.
+/// </summary>
+public class DocumentationRendererTests
+{
+    private static string SampleRoot => Path.Combine(AppContext.BaseDirectory, "Fixtures", "Sample");
+
+    private static IReadOnlyList<DocumentedType> SampleSurface()
+    {
+        var files = new SourceFileDiscovery().Discover([SampleRoot], []);
+        var trees = new SourceParser().Parse(files);
+        var compilation = new CompilationBuilder().Build(trees);
+        return new ApiSurfaceExtractor().Extract(compilation, ["public", "protected"]);
+    }
+
+    private static string Page(IReadOnlyList<RenderedPage> pages, string relativePath)
+        => pages.Single(page => page.RelativePath == relativePath).Content;
+
+    [Fact(DisplayName = "Renders one page per type plus the index when requested")]
+    public void Renders_one_page_per_type_plus_index()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: true);
+
+        // 5 sample types (Animal, IShape, Circle, AnimalTests, Models) + index.
+        Assert.Equal(6, pages.Count);
+        Assert.Contains(pages, page => page.RelativePath == "index.md");
+    }
+
+    [Fact(DisplayName = "Omits the index page when not requested")]
+    public void Omits_index_when_not_requested()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        Assert.DoesNotContain(pages, page => page.RelativePath == "index.md");
+        Assert.Equal(5, pages.Count);
+    }
+
+    [Fact(DisplayName = "Names each page by the type's full name")]
+    public void Names_pages_by_full_type_name()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        Assert.Contains(pages, page => page.RelativePath == "Sample.Shapes.Circle.md");
+    }
+
+    [Fact(DisplayName = "A type page has its header, signature and summary")]
+    public void Type_page_has_header_signature_summary()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        var circle = Page(pages, "Sample.Shapes.Circle.md");
+        Assert.Contains("# Circle", circle);
+        Assert.Contains("public sealed class Circle", circle);
+        Assert.Contains("A circle", circle);
+    }
+
+    [Fact(DisplayName = "Resolves a cref to another documented type as a link")]
+    public void Resolves_cref_to_link()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        // Circle's summary references <see cref="IShape"/>, which is also documented.
+        Assert.Contains("[IShape](Sample.IShape.md)", Page(pages, "Sample.Shapes.Circle.md"));
+    }
+
+    [Fact(DisplayName = "The type info line is a quote block with namespace and linked direct parents")]
+    public void Type_info_line_quotes_namespace_and_links_parents()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        // Circle (Sample.Shapes) implements the documented IShape (Sample), so its info line carries both, as a quote.
+        var circle = Page(pages, "Sample.Shapes.Circle.md");
+        Assert.Contains("> Namespace: `Sample.Shapes` | Inherits from: [`IShape`](Sample.IShape.md)", circle);
+    }
+
+    [Fact(DisplayName = "A type with no base or interfaces shows only the namespace in its info line")]
+    public void Type_info_line_without_parents_shows_namespace_only()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        // Animal has no base type or interfaces, so there is no "Inherits from" segment.
+        var animal = Page(pages, "Sample.Animal.md");
+        Assert.Contains("> Namespace: `Sample`", animal);
+        Assert.DoesNotContain("Inherits from:", animal);
+    }
+
+    [Fact(DisplayName = "Namespace grouping relativizes a parent link in the info line")]
+    public void Type_info_line_relativizes_parent_link_under_grouping()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false, Grouping.Namespace);
+
+        // From Sample.Shapes/ up to Sample/IShape.md, like the cross-namespace cref links.
+        Assert.Contains("Inherits from: [`IShape`](../Sample/IShape.md)", Page(pages, "Sample.Shapes/Circle.md"));
+    }
+
+    [Fact(DisplayName = "Lists members with a heading and an explicit anchor")]
+    public void Member_has_heading_and_anchor()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        var circle = Page(pages, "Sample.Shapes.Circle.md");
+        Assert.Contains("### Area()", circle);
+        Assert.Contains("<a id=\"area\"></a>", circle);
+    }
+
+    [Fact(DisplayName = "Expands a member's <inheritdoc/> from the interface it implements")]
+    public void Expands_inheritdoc_from_implemented_interface()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        // Circle.Area() carries only <inheritdoc/>; it implements IShape.Area(), whose summary should now show.
+        var circle = Page(pages, "Sample.Shapes.Circle.md");
+        Assert.Contains("### Area()", circle);
+        Assert.Contains("Computes the area of the shape.", circle);
+    }
+
+    [Fact(DisplayName = "The index groups types by namespace and links them")]
+    public void Index_groups_and_links_types()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: true);
+
+        var index = Page(pages, "index.md");
+        Assert.Contains("# API Reference", index);
+        Assert.Contains("## Sample.Shapes", index);
+        Assert.Contains("[Circle](Sample.Shapes.Circle.md)", index);
+    }
+
+    [Fact(DisplayName = "Namespace grouping places each type page in its namespace folder")]
+    public void Namespace_grouping_folders_pages()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false, Grouping.Namespace);
+
+        Assert.Contains(pages, page => page.RelativePath == "Sample.Shapes/Circle.md");
+        Assert.Contains(pages, page => page.RelativePath == "Sample/IShape.md");
+        // Sibling, not nested: Sample.Shapes is its own folder, not under a Sample/ tree.
+        Assert.DoesNotContain(pages, page => page.RelativePath == "Sample/Shapes/Circle.md");
+    }
+
+    [Fact(DisplayName = "Namespace grouping relativizes a cross-namespace cref link")]
+    public void Namespace_grouping_relativizes_cross_namespace_link()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: true, Grouping.Namespace);
+
+        // Circle (Sample.Shapes) references IShape (Sample): from Sample.Shapes/ up to Sample/IShape.md.
+        Assert.Contains("[IShape](../Sample/IShape.md)", Page(pages, "Sample.Shapes/Circle.md"));
+        // The index lives at the root, so its links are the plain folder paths.
+        Assert.Contains("[Circle](Sample.Shapes/Circle.md)", Page(pages, "index.md"));
+    }
+
+    [Fact(DisplayName = "Omits the synthesized IEquatable from a record signature")]
+    public void Record_signature_omits_synthesized_iequatable()
+    {
+        var pages = new DocumentationRenderer().Render(SurfaceFrom(SignaturesFile), includeIndex: false);
+
+        var point = Page(pages, "Sample.Signatures.Point.md");
+        Assert.Contains("public record Point", point);
+        Assert.DoesNotContain("IEquatable<Point>", point);
+    }
+
+    [Fact(DisplayName = "A resolved value-type default does not render as = null")]
+    public void Resolved_value_type_default_is_not_null()
+    {
+        var pages = new DocumentationRenderer().Render(SurfaceFrom(SignaturesFile), includeIndex: false);
+
+        // A resolved struct default renders as default(T), never the misleading = null (which only happens when the
+        // parameter's type is unresolved). See CompilationBuilder's implicit-usings injection.
+        var worker = Page(pages, "Sample.Signatures.Worker.md");
+        Assert.Contains("cancellationToken = default(CancellationToken)", worker);
+        Assert.DoesNotContain("= null", worker);
+    }
+
+    private static string SignaturesFile => Path.Combine(AppContext.BaseDirectory, "Fixtures", "Signatures", "Samples.cs");
+
+    private static IReadOnlyList<DocumentedType> SurfaceFrom(params string[] files)
+    {
+        var trees = new SourceParser().Parse(files);
+        var compilation = new CompilationBuilder().Build(trees);
+        return new ApiSurfaceExtractor().Extract(compilation, ["public", "protected"]);
+    }
+}
