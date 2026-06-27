@@ -405,7 +405,7 @@ Trusted Publishing issues short-lived OIDC tokens from GitHub Actions instead of
 2. Add a new policy with these values (case-insensitive):
    - **Repository Owner:** the GitHub organization or user name (e.g. `my-org`)
    - **Repository:** the repository name (e.g. `my-repo`)
-   - **Workflow file:** `release-please.yml` (filename only, no path)
+   - **Workflow file:** `release.yml` (filename only, no path)
    - **Environment:** leave empty
 3. Set the policy owner to your nuget.org account or organization
 
@@ -461,7 +461,7 @@ jobs:
         run: dotnet test --no-build --configuration Release
 ```
 
-#### Release Please + publish (`release-please.yml`)
+#### Release Please + publish (`release.yml`)
 
 Fires on every push to `main`. The `release-please` job reads conventional commits since the last release and creates or updates a release PR that bumps `CHANGELOG.md` and `version.txt`. When that PR is merged, `release-please` creates the git tag and GitHub Release, then the `publish` job runs conditionally based on the `release_created` output.
 
@@ -483,6 +483,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v5
         id: release
@@ -500,8 +501,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0   # MinVer needs full history to read the release tag
-          fetch-tags: true # fetch-depth: 0 alone does not guarantee tags are fetched
+          ref: ${{ needs.release.outputs.tag_name }}  # check out the tag directly so MinVer sees it at HEAD
+          fetch-depth: 0
+          fetch-tags: true
 
       - uses: actions/setup-dotnet@v5
         with:
