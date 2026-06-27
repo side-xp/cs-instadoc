@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/side-xp/cs-instadoc/compare/v1.0.1...v1.0.2) (2026-06-27)
+
+
+### Bug Fixes
+
+* fixed version tags on NuGet ([bc308ef](https://github.com/side-xp/cs-instadoc/commit/bc308ef4f81432b0fd28a0fce845c617f6dae3aa))
+
 ## [1.0.1](https://github.com/side-xp/cs-instadoc/compare/v1.0.0...v1.0.1) (2026-06-27)
 
 
