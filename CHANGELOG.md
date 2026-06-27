@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/side-xp/cs-instadoc/compare/v1.0.0...v1.0.1) (2026-06-27)
+
+
+### Bug Fixes
+
+* fixed publish workflow ([e76ccc8](https://github.com/side-xp/cs-instadoc/commit/e76ccc8a6fbd91685eab3f982fe08f051df51f4a))
+
 ## 1.0.0 (2026-06-27)
 
 
