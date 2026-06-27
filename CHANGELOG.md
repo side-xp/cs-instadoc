@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/side-xp/cs-instadoc/compare/v1.0.3...v1.0.4) (2026-06-27)
+
+
+### Bug Fixes
+
+* fixed MinVer version tracking ([2b8f1f9](https://github.com/side-xp/cs-instadoc/commit/2b8f1f9d9594ce7f17f5791d8d624f1a88870161))
+
 ## [1.0.3](https://github.com/side-xp/cs-instadoc/compare/v1.0.2...v1.0.3) (2026-06-27)
 
 
