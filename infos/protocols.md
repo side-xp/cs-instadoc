@@ -371,4 +371,194 @@ dotnet tool uninstall --global Vendor.MyApp
 
 ## Publish to NuGet (GitHub Actions)
 
-@todo release workflow triggered by pushing a `v*` git tag: `dotnet pack` then `dotnet nuget push` with a `NUGET_API_KEY` repository secret, checked out with `fetch-depth: 0` so MinVer sees the tags.
+The release process uses [Release Please](https://github.com/googleapis/release-please) for version management and a dedicated GitHub Actions workflow for publishing. Release Please reads conventional commits, maintains `CHANGELOG.md`, and creates a tagged GitHub Release when a release PR is merged. The publish workflow fires on that release and pushes the package to nuget.org using [Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing) — keyless OIDC-based authentication, no long-lived secrets.
+
+### Additional package metadata
+
+The properties covered in [As a .NET tool (NuGet)](#as-a-net-tool-nuget) are the minimum. Before a first publish, also add:
+
+```xml
+<PropertyGroup>
+  <Title>My Tool</Title>
+  <Copyright>Copyright (c) 2024 Author Name</Copyright>
+  <PackageIcon>icon.png</PackageIcon>
+  <RepositoryType>git</RepositoryType>
+</PropertyGroup>
+
+<ItemGroup>
+  <None Include="icon.png" Pack="true" PackagePath="" />
+</ItemGroup>
+```
+
+- **`Title`** — human-friendly display name shown in the nuget.org UI. Without it, nuget.org falls back to `PackageId`.
+- **`Copyright`** — shown on the package page.
+- **`PackageIcon`** — a PNG file (128×128 px minimum) shown in search results. Without one you get a generic grey placeholder.
+- **`RepositoryType`** — enables Source Link integrations.
+
+**Note**: `README.md` is already declared as `PackageReadmeFile` and included as a `<None>` item, so it becomes the description page on nuget.org as-is. Write it for that audience before first publish.
+
+### Enable Trusted Publishing on nuget.org (one-time)
+
+Trusted Publishing issues short-lived OIDC tokens from GitHub Actions instead of storing a long-lived API key. Nothing to rotate, nothing to leak.
+
+1. Log in to [nuget.org](https://www.nuget.org) → click your username → **Trusted Publishing**
+2. Add a new policy with these values (case-insensitive):
+   - **Repository Owner:** the GitHub organization or user name (e.g. `my-org`)
+   - **Repository:** the repository name (e.g. `my-repo`)
+   - **Workflow file:** `publish.yml` — filename only, no path
+   - **Environment:** leave empty
+3. Set the policy owner to your nuget.org account or organization
+
+The policy becomes permanently active after the first successful publish. Until then it is temporarily active for 7 days — if no publish happens in that window, it deactivates, but can be reactivated at any time.
+
+### Configure the GitHub repository (one-time)
+
+1. **Settings → Actions → General → Workflow permissions:** enable *Allow GitHub Actions to create and approve pull requests* — Release Please needs this to open release PRs.
+2. **Settings → Variables → Actions → New repository variable:** add `NUGET_USER` set to your nuget.org profile name (not your email — find it at the top-right of nuget.org after logging in).
+
+### Add the workflow files
+
+Three workflow files are needed under `.github/workflows/`.
+
+#### CI (`ci.yml`)
+
+Runs tests on every push and pull request.
+
+```yml
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+```
+
+#### Release Please (`release-please.yml`)
+
+Fires on every push to `main`. Reads conventional commits since the last release, then creates or updates a release PR that bumps `CHANGELOG.md` and `version.txt`. Merging that PR creates the git tag and GitHub Release that trigger the publish workflow.
+
+```yml
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+```
+
+Two config files are required at the repository root alongside the workflows.
+
+`release-please-config.json`:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true
+    }
+  }
+}
+```
+
+`.release-please-manifest.json` — tracks the current released version; Release Please updates this file in every release PR:
+
+```json
+{
+  ".": "0.0.0"
+}
+```
+
+**Note**: `release-type: simple` manages a `version.txt` bookkeeping file alongside `CHANGELOG.md`. The actual package version still comes from MinVer reading the git tag — the two don't interfere.
+
+**Note**: `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` prevent `feat:` commits from bumping the major version while the package is pre-1.0. Remove both options once you're ready to publish a stable version.
+
+#### Publish (`publish.yml`)
+
+Fires when GitHub creates a release (which Release Please does automatically when a release PR is merged). Checks out with `fetch-depth: 0` so MinVer can read the tag, builds, tests, packs, and pushes to nuget.org via Trusted Publishing.
+
+```yml
+name: Publish to NuGet
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # required for OIDC token issuance (Trusted Publishing)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # MinVer needs full history to read the release tag
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+      - name: Pack
+        run: dotnet pack MyApp.csproj --no-build --configuration Release --output ./nupkg
+
+      - name: Login to NuGet (Trusted Publishing)
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Push to NuGet
+        run: >
+          dotnet nuget push ./nupkg/*.nupkg
+          --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+```
+
+**Note**: `id-token: write` on the job allows GitHub Actions to issue the OIDC token that NuGet's Trusted Publishing validates. Without it, the `NuGet/login@v1` step fails. The temporary API key is valid for 1 hour.
+
+**Note**: `dotnet pack` targets the project file directly (not the solution) to avoid attempting to pack the test project.
