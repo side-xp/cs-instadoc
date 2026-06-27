@@ -93,7 +93,7 @@ public sealed partial class DocumentationRenderer
             pages.Add(new RenderedPage
             {
                 RelativePath = path,
-                Content = RenderType(type, converter, sourceMembers),
+                Content = RenderType(type, converter, sourceMembers, pageMap, path),
             });
         }
 
@@ -168,16 +168,15 @@ public sealed partial class DocumentationRenderer
     private string RenderType(
         DocumentedType type,
         DocCommentMarkdownConverter converter,
-        IReadOnlyDictionary<string, ISymbol>? sourceMembers)
+        IReadOnlyDictionary<string, ISymbol>? sourceMembers,
+        IReadOnlyDictionary<string, string> pageMap,
+        string fromPage)
     {
         var sb = new StringBuilder();
 
         sb.Append("# ").Append(type.Symbol.ToDisplayString(NameWithGenerics)).Append("\n\n");
 
-        if (!type.Symbol.ContainingNamespace.IsGlobalNamespace)
-        {
-            sb.Append("Namespace: `").Append(type.Symbol.ContainingNamespace.ToDisplayString()).Append("`\n\n");
-        }
+        AppendTypeInfo(sb, type.Symbol, pageMap, fromPage);
 
         sb.Append("```csharp\n").Append(TypeSignature(type.Symbol)).Append("\n```\n\n");
 
@@ -202,6 +201,69 @@ public sealed partial class DocumentationRenderer
         }
 
         return sb.ToString().TrimEnd() + "\n";
+    }
+
+    /// <summary>
+    /// Appends the type's info line, each linked to its page when documented. Nothing is emitted for a
+    /// global-namespace type with no parents.
+    /// </summary>
+    private static void AppendTypeInfo(
+        StringBuilder sb,
+        INamedTypeSymbol type,
+        IReadOnlyDictionary<string, string> pageMap,
+        string fromPage)
+    {
+        var segments = new List<string>();
+
+        if (!type.ContainingNamespace.IsGlobalNamespace)
+        {
+            segments.Add($"Namespace: `{type.ContainingNamespace.ToDisplayString()}`");
+        }
+
+        var parents = DirectParents(type).Select(parent => ParentLink(parent, pageMap, fromPage)).ToList();
+        if (parents.Count > 0)
+        {
+            segments.Add("Inherits from: " + string.Join(", ", parents));
+        }
+
+        if (segments.Count > 0)
+        {
+            sb.Append("> ").Append(string.Join(" | ", segments)).Append("\n\n");
+        }
+    }
+
+    /// <summary>
+    /// The type's direct parents: its immediate base class (skipping the implicit <see cref="object"/>) followed by the
+    /// interfaces it declares itself. Mirrors the base list shown in <see cref="TypeSignature"/>.
+    /// </summary>
+    private static IEnumerable<INamedTypeSymbol> DirectParents(INamedTypeSymbol type)
+    {
+        if (type.TypeKind == TypeKind.Class
+            && type.BaseType is { SpecialType: not SpecialType.System_Object } baseType)
+        {
+            yield return baseType;
+        }
+        foreach (var @interface in type.Interfaces.Where(@interface => !IsSynthesizedRecordInterface(type, @interface)))
+        {
+            yield return @interface;
+        }
+    }
+
+    /// <summary>
+    /// Renders one parent as inline code, linked to its page when it is part of the documented surface. The lookup uses
+    /// the parent's original definition so a constructed generic base (eg. <c>Container&lt;int&gt;</c>) still resolves
+    /// to the open type's page, while the displayed name keeps the constructed form.
+    /// </summary>
+    private static string ParentLink(
+        INamedTypeSymbol parent,
+        IReadOnlyDictionary<string, string> pageMap,
+        string fromPage)
+    {
+        var name = parent.ToDisplayString(TypeReference);
+        var id = parent.OriginalDefinition.GetDocumentationCommentId();
+        return id is not null && pageMap.TryGetValue(id, out var target)
+            ? $"[`{name}`]({RelativeLink(fromPage, target)})"
+            : $"`{name}`";
     }
 
     /// <summary>
