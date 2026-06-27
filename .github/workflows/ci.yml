@@ -3,11 +3,19 @@ name: CI
 on:
   push:
     branches: [main, develop]
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'version.txt'
+      - '.release-please-manifest.json'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'version.txt'
+      - '.release-please-manifest.json'
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
