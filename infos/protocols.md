@@ -405,7 +405,7 @@ Trusted Publishing issues short-lived OIDC tokens from GitHub Actions instead of
 2. Add a new policy with these values (case-insensitive):
    - **Repository Owner:** the GitHub organization or user name (e.g. `my-org`)
    - **Repository:** the repository name (e.g. `my-repo`)
-   - **Workflow file:** `publish.yml` — filename only, no path
+   - **Workflow file:** `release-please.yml` (filename only, no path)
    - **Environment:** leave empty
 3. Set the policy owner to your nuget.org account or organization
 
@@ -500,7 +500,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0  # MinVer needs full history to read the release tag
+          fetch-depth: 0   # MinVer needs full history to read the release tag
+          fetch-tags: true # fetch-depth: 0 alone does not guarantee tags are fetched
 
       - uses: actions/setup-dotnet@v5
         with:
