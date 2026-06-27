@@ -38,6 +38,10 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
         [Description("Keep existing files in the output folder. By default, stale .md files are cleared before writing.")]
         public bool NoClean { get; init; }
 
+        [CommandOption("-q|--quiet")]
+        [Description("Suppress informational output. Errors are still written to stderr and the exit code is non-zero on failure.")]
+        public bool Quiet { get; init; }
+
         [CommandOption("--grouping <MODE>")]
         [Description("Output layout: none (flat, default) or namespace (one folder per namespace).")]
         public string Grouping { get; init; } = "none";
@@ -80,24 +84,45 @@ public sealed class GenerateCommand : Command<GenerateCommand.Settings>
             Grouping = Enum.Parse<Generation.Grouping>(settings.Grouping, ignoreCase: true),
         };
 
-        var table = new Table().Border(TableBorder.Rounded);
-        table.AddColumn("Setting");
-        table.AddColumn("Value");
-        table.AddRow("Input", string.Join("\n", options.Input));
-        table.AddRow("Output", options.Output);
-        table.AddRow("Visibility", string.Join(", ", options.Visibility));
-        table.AddRow("Exclude", options.Exclude.Count == 0 ? "[dim](none)[/]" : string.Join("\n", options.Exclude));
-        table.AddRow("Index", options.Index ? "yes" : "no");
-        table.AddRow("Clean output", options.Clean ? "yes" : "no");
-        table.AddRow("Grouping", options.Grouping.ToString().ToLowerInvariant());
-        AnsiConsole.Write(table);
+        if (!settings.Quiet)
+        {
+            var table = new Table().Border(TableBorder.Rounded);
+            table.AddColumn("Setting");
+            table.AddColumn("Value");
+            table.AddRow("Input", string.Join("\n", options.Input));
+            table.AddRow("Output", options.Output);
+            table.AddRow("Visibility", string.Join(", ", options.Visibility));
+            table.AddRow("Exclude", options.Exclude.Count == 0 ? "[dim](none)[/]" : string.Join("\n", options.Exclude));
+            table.AddRow("Index", options.Index ? "yes" : "no");
+            table.AddRow("Clean output", options.Clean ? "yes" : "no");
+            table.AddRow("Grouping", options.Grouping.ToString().ToLowerInvariant());
+            AnsiConsole.Write(table);
+        }
 
-        var generator = new DocumentationGenerator();
-        var result = generator.Generate(options, cancellationToken);
+        GenerationResult result;
+        try
+        {
+            result = new DocumentationGenerator().Generate(options, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            Console.Error.WriteLine("instadoc: cancelled.");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"instadoc: {ex.Message}");
+            return 1;
+        }
 
-        AnsiConsole.MarkupLine($"Discovered [green]{result.SourceFilesDiscovered}[/] source file(s).");
-        AnsiConsole.MarkupLine($"Selected [green]{result.TypesDocumented}[/] type(s) to document.");
-        AnsiConsole.MarkupLine($"Wrote [green]{result.FilesWritten.Count}[/] file(s) to [blue]{options.Output}[/].");
+        if (!settings.Quiet)
+        {
+            AnsiConsole.MarkupLine(
+                $"Generated [green]{result.TypesDocumented}[/] type(s) " +
+                $"from [green]{result.SourceFilesDiscovered}[/] source file(s) " +
+                $"→ [blue]{options.Output}[/] " +
+                $"([green]{result.FilesWritten.Count}[/] file(s) written).");
+        }
 
         return 0;
     }
