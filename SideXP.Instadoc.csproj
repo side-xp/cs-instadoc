@@ -22,6 +22,8 @@
     <PackageIcon>icon.png</PackageIcon>
     <RepositoryUrl>https://github.com/side-xp/cs-instadoc</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+
+    <MinVerTagPrefix>v</MinVerTagPrefix>
     <PackageProjectUrl>https://github.com/side-xp/cs-instadoc</PackageProjectUrl>
     <PackageTags>roslyn;documentation;docs;markdown;csharp;api</PackageTags>
   </PropertyGroup>

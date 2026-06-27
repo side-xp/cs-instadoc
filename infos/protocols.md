@@ -279,7 +279,7 @@ If the project under test sits at the **repository root** (rather than in its ow
 
 ## Versioning (MinVer)
 
-The preferred approach is to **derive the version from git tags** with [`MinVer`](https://github.com/adamralph/minver) rather than hardcoding `<Version>` in the `.csproj`. Tagging `v1.2.3` produces version `1.2.3`; between tags you get a prerelease version automatically. A release then needs no manual version bump — you just push a tag.
+The preferred approach is to **derive the version from git tags** with [`MinVer`](https://github.com/adamralph/minver) rather than hardcoding `<Version>` in the `.csproj`. Tagging a release produces a matching version; between tags you get a prerelease version automatically. A release then needs no manual version bump — you just push a tag.
 
 ### Add MinVer
 
@@ -289,7 +289,20 @@ dotnet add package MinVer
 
 **Note**: MinVer marks itself as a development dependency, so `dotnet add package` records it with `PrivateAssets="all"` automatically — it never flows to consumers of your package.
 
-**Note**: When building or packing in CI, check out with full history and tags (`fetch-depth: 0` for `actions/checkout`), otherwise MinVer can't see the tags and falls back to `0.0.0-alpha.0`.
+### Match the tag prefix
+
+By default MinVer only recognizes tags with **no prefix** (`1.2.3`). The common convention — and what Release Please produces — is a `v` prefix (`v1.2.3`). If your tags carry a prefix you **must** tell MinVer about it, otherwise it ignores every tag, finds none, and silently falls back to `0.0.0-alpha.0.{height}`:
+
+```xml
+<PropertyGroup>
+  <!-- Tags are `v1.2.3`; MinVer defaults to no prefix, so it must be told about the `v`. -->
+  <MinVerTagPrefix>v</MinVerTagPrefix>
+</PropertyGroup>
+```
+
+**Note**: This is the single most common reason a MinVer package publishes as `0.0.0-alpha.0.x` despite real tags existing — the tags are there, just not in the shape MinVer was looking for. The fallback is identical to the "no tags reachable" case, which makes it easy to misdiagnose as a checkout/fetch problem.
+
+**Note**: When building or packing in CI, also check out with full history and tags (`fetch-depth: 0` for `actions/checkout`), otherwise MinVer genuinely can't see the tags and falls back to `0.0.0-alpha.0` for that reason instead.
 
 ### Surface the version in the CLI
 
@@ -501,7 +514,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.release.outputs.tag_name }}  # check out the tag directly so MinVer sees it at HEAD
+          ref: ${{ needs.release-please.outputs.tag_name }}  # check out the tag directly so MinVer sees it at HEAD
           fetch-depth: 0
           fetch-tags: true
 
@@ -562,6 +575,8 @@ Two config files are required at the repository root alongside the workflows.
 ```
 
 **Note**: `release-type: simple` manages a `version.txt` bookkeeping file alongside `CHANGELOG.md`. The actual package version still comes from MinVer reading the git tag — the two don't interfere.
+
+**Note**: Release Please tags releases as `v1.2.3` (with the `v` prefix). For MinVer to read that tag the project **must** set `<MinVerTagPrefix>v</MinVerTagPrefix>` — see [Match the tag prefix](#match-the-tag-prefix). Without it, every published package is stamped `0.0.0-alpha.0.x` even though tagging, the release, and the push all succeed.
 
 **Note**: `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` prevent `feat:` commits from bumping the major version while the package is pre-1.0. Remove both options once you're ready to publish a stable version.
 
