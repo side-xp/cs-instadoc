@@ -4,7 +4,7 @@ namespace SideXP.Instadoc.Tests;
 
 /// <summary>
 /// Tests for <see cref="DocumentationRenderer"/>: one page per type, an optional index, resolved cross-reference links,
-/// and per-member anchors — all asserted on the rendered strings, without touching disk.
+/// and per-member anchors, all asserted on the rendered strings, without touching disk.
 /// </summary>
 public class DocumentationRendererTests
 {
@@ -66,6 +66,36 @@ public class DocumentationRendererTests
 
         // Circle's summary references <see cref="IShape"/>, which is also documented.
         Assert.Contains("[IShape](Sample.IShape.md)", Page(pages, "Sample.Shapes.Circle.md"));
+    }
+
+    [Fact(DisplayName = "The type info line is a quote block with namespace and linked direct parents")]
+    public void Type_info_line_quotes_namespace_and_links_parents()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        // Circle (Sample.Shapes) implements the documented IShape (Sample), so its info line carries both, as a quote.
+        var circle = Page(pages, "Sample.Shapes.Circle.md");
+        Assert.Contains("> Namespace: `Sample.Shapes` | Inherits from: [`IShape`](Sample.IShape.md)", circle);
+    }
+
+    [Fact(DisplayName = "A type with no base or interfaces shows only the namespace in its info line")]
+    public void Type_info_line_without_parents_shows_namespace_only()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
+
+        // Animal has no base type or interfaces, so there is no "Inherits from" segment.
+        var animal = Page(pages, "Sample.Animal.md");
+        Assert.Contains("> Namespace: `Sample`", animal);
+        Assert.DoesNotContain("Inherits from:", animal);
+    }
+
+    [Fact(DisplayName = "Namespace grouping relativizes a parent link in the info line")]
+    public void Type_info_line_relativizes_parent_link_under_grouping()
+    {
+        var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false, Grouping.Namespace);
+
+        // From Sample.Shapes/ up to Sample/IShape.md, like the cross-namespace cref links.
+        Assert.Contains("Inherits from: [`IShape`](../Sample/IShape.md)", Page(pages, "Sample.Shapes/Circle.md"));
     }
 
     [Fact(DisplayName = "Lists members with a heading and an explicit anchor")]
