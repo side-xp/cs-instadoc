@@ -418,11 +418,11 @@ The policy becomes permanently active after the first successful publish. Until 
 
 ### Add the workflow files
 
-Three workflow files are needed under `.github/workflows/`.
+Two workflow files are needed under `.github/workflows/`.
 
 #### CI (`ci.yml`)
 
-Runs tests on every push and pull request.
+Runs tests on every push and pull request. `paths-ignore` skips the job when the only changes are Release Please bookkeeping files (`CHANGELOG.md`, `version.txt`, `.release-please-manifest.json`), avoiding a redundant test run every time a release PR is merged.
 
 ```yml
 name: CI
@@ -430,8 +430,16 @@ name: CI
 on:
   push:
     branches: [main, develop]
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'version.txt'
+      - '.release-please-manifest.json'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - 'version.txt'
+      - '.release-please-manifest.json'
 
 jobs:
   test:
@@ -453,9 +461,11 @@ jobs:
         run: dotnet test --no-build --configuration Release
 ```
 
-#### Release Please (`release-please.yml`)
+#### Release Please + publish (`release-please.yml`)
 
-Fires on every push to `main`. Reads conventional commits since the last release, then creates or updates a release PR that bumps `CHANGELOG.md` and `version.txt`. Merging that PR creates the git tag and GitHub Release that trigger the publish workflow.
+Fires on every push to `main`. The `release-please` job reads conventional commits since the last release and creates or updates a release PR that bumps `CHANGELOG.md` and `version.txt`. When that PR is merged, `release-please` creates the git tag and GitHub Release, then the `publish` job runs conditionally based on the `release_created` output.
+
+The publish job is colocated here rather than in a separate workflow because GitHub Actions does not fire events triggered by `GITHUB_TOKEN` (the token Release Please uses to create the release) — a separate workflow listening on `release: [published]` would never trigger.
 
 ```yml
 name: Release Please
@@ -471,59 +481,22 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
     steps:
       - uses: google-github-actions/release-please-action@v4
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-```
 
-Two config files are required at the repository root alongside the workflows.
-
-`release-please-config.json`:
-
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "packages": {
-    ".": {
-      "release-type": "simple",
-      "changelog-path": "CHANGELOG.md",
-      "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": true
-    }
-  }
-}
-```
-
-`.release-please-manifest.json` — tracks the current released version; Release Please updates this file in every release PR:
-
-```json
-{
-  ".": "0.0.0"
-}
-```
-
-**Note**: `release-type: simple` manages a `version.txt` bookkeeping file alongside `CHANGELOG.md`. The actual package version still comes from MinVer reading the git tag — the two don't interfere.
-
-**Note**: `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` prevent `feat:` commits from bumping the major version while the package is pre-1.0. Remove both options once you're ready to publish a stable version.
-
-#### Publish (`publish.yml`)
-
-Fires when GitHub creates a release (which Release Please does automatically when a release PR is merged). Checks out with `fetch-depth: 0` so MinVer can read the tag, builds, tests, packs, and pushes to nuget.org via Trusted Publishing.
-
-```yml
-name: Publish to NuGet
-
-on:
-  release:
-    types: [published]
-
-jobs:
   publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       id-token: write  # required for OIDC token issuance (Trusted Publishing)
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -559,6 +532,36 @@ jobs:
           --skip-duplicate
 ```
 
-**Note**: `id-token: write` on the job allows GitHub Actions to issue the OIDC token that NuGet's Trusted Publishing validates. Without it, the `NuGet/login@v1` step fails. The temporary API key is valid for 1 hour.
+Two config files are required at the repository root alongside the workflows.
+
+`release-please-config.json`:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true
+    }
+  }
+}
+```
+
+`.release-please-manifest.json` — tracks the current released version; Release Please updates this file in every release PR:
+
+```json
+{
+  ".": "0.0.0"
+}
+```
+
+**Note**: `release-type: simple` manages a `version.txt` bookkeeping file alongside `CHANGELOG.md`. The actual package version still comes from MinVer reading the git tag — the two don't interfere.
+
+**Note**: `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` prevent `feat:` commits from bumping the major version while the package is pre-1.0. Remove both options once you're ready to publish a stable version.
+
+**Note**: `id-token: write` on the `publish` job allows GitHub Actions to issue the OIDC token that NuGet's Trusted Publishing validates. Without it, the `NuGet/login@v1` step fails. The temporary API key is valid for 1 hour.
 
 **Note**: `dotnet pack` targets the project file directly (not the solution) to avoid attempting to pack the test project.
