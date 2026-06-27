@@ -13,11 +13,15 @@
     <PackageId>SideXP.Instadoc</PackageId>
 
     <!-- Metadata shown on nuget.org. -->
+    <Title>Instadoc</Title>
     <Authors>Sideways Experiments</Authors>
+    <Copyright>Copyright (c) 2022-2026 Sideways Experiments</Copyright>
     <Description>CLI tool for generating MarkDown documentation from XML comments.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <RepositoryUrl>https://github.com/side-xp/cs-instadoc</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/side-xp/cs-instadoc</PackageProjectUrl>
     <PackageTags>roslyn;documentation;docs;markdown;csharp;api</PackageTags>
   </PropertyGroup>
@@ -41,6 +45,7 @@
   <ItemGroup>
     <!-- Reused as the NuGet package description page. -->
     <None Include="README.md" Pack="true" PackagePath="" />
+    <None Include="icon.png" Pack="true" PackagePath="" />
   </ItemGroup>
 
   <!--
