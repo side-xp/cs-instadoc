@@ -405,7 +405,7 @@ Trusted Publishing issues short-lived OIDC tokens from GitHub Actions instead of
 2. Add a new policy with these values (case-insensitive):
    - **Repository Owner:** the GitHub organization or user name (e.g. `my-org`)
    - **Repository:** the repository name (e.g. `my-repo`)
-   - **Workflow file:** `publish.yml` — filename only, no path
+   - **Workflow file:** `release-please.yml` (filename only, no path)
    - **Environment:** leave empty
 3. Set the policy owner to your nuget.org account or organization
 
