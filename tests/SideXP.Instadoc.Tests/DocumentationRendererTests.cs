@@ -54,7 +54,7 @@ public class DocumentationRendererTests
         var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
 
         var circle = Page(pages, "Sample.Shapes.Circle.md");
-        Assert.Contains("# Circle", circle);
+        Assert.Contains("# `Circle`", circle);
         Assert.Contains("public sealed class Circle", circle);
         Assert.Contains("A circle", circle);
     }
@@ -104,7 +104,7 @@ public class DocumentationRendererTests
         var pages = new DocumentationRenderer().Render(SampleSurface(), includeIndex: false);
 
         var circle = Page(pages, "Sample.Shapes.Circle.md");
-        Assert.Contains("### Area()", circle);
+        Assert.Contains("### `Area()`", circle);
         Assert.Contains("<a id=\"area\"></a>", circle);
     }
 
@@ -115,7 +115,7 @@ public class DocumentationRendererTests
 
         // Circle.Area() carries only <inheritdoc/>; it implements IShape.Area(), whose summary should now show.
         var circle = Page(pages, "Sample.Shapes.Circle.md");
-        Assert.Contains("### Area()", circle);
+        Assert.Contains("### `Area()`", circle);
         Assert.Contains("Computes the area of the shape.", circle);
     }
 

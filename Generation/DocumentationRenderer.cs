@@ -174,7 +174,7 @@ public sealed partial class DocumentationRenderer
     {
         var sb = new StringBuilder();
 
-        sb.Append("# ").Append(type.Symbol.ToDisplayString(NameWithGenerics)).Append("\n\n");
+        sb.Append("# `").Append(type.Symbol.ToDisplayString(NameWithGenerics)).Append("`\n\n");
 
         AppendTypeInfo(sb, type.Symbol, pageMap, fromPage);
 
@@ -193,7 +193,7 @@ public sealed partial class DocumentationRenderer
             sb.Append("## ").Append(title).Append("\n\n");
             foreach (var member in members)
             {
-                sb.Append("### ").Append(member.ToDisplayString(MemberTitle)).Append("\n\n");
+                sb.Append("### `").Append(member.ToDisplayString(MemberTitle)).Append("`\n\n");
                 sb.Append("<a id=\"").Append(AnchorFor(member)).Append("\"></a>\n\n");
                 sb.Append("```csharp\n").Append(member.ToDisplayString(MemberSignature)).Append("\n```\n\n");
                 AppendDoc(sb, member, converter, sourceMembers);
