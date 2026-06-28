@@ -36,7 +36,7 @@ public class InheritDocTests
     /// <summary>The slice of a page covering one member: from its <c>### heading</c> to the next one (or the end).</summary>
     private static string Section(string page, string heading)
     {
-        var start = page.IndexOf("### " + heading, StringComparison.Ordinal);
+        var start = page.IndexOf("### `" + heading + "`", StringComparison.Ordinal);
         Assert.True(start >= 0, $"section '{heading}' not found");
         var next = page.IndexOf("### ", start + 4, StringComparison.Ordinal);
         return next >= 0 ? page[start..next] : page[start..];
