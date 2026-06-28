@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/side-xp/cs-instadoc/compare/v1.0.4...v1.1.0) (2026-06-28)
+
+
+### Features
+
+* use inline code syntax for headings when meaningful ([ff79490](https://github.com/side-xp/cs-instadoc/commit/ff794907c475ccc93988728b24c2213166f8579f))
+
 ## [1.0.4](https://github.com/side-xp/cs-instadoc/compare/v1.0.3...v1.0.4) (2026-06-27)
 
 
